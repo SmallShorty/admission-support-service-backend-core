@@ -14,7 +14,7 @@ datasource db {
 }
 
 model Account {
-  id            String          @id @db.Uuid
+  id            String          @id @default(uuid()) @db.Uuid
   externalId    String?         @map("external_id") @db.VarChar
   lastName      String          @map("last_name") @db.VarChar
   firstName     String          @map("first_name") @db.VarChar
