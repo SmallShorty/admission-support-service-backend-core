@@ -1,0 +1,234 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id            String          @id @db.Uuid
+  externalId    String?         @map("external_id") @db.VarChar
+  lastName      String          @map("last_name") @db.VarChar
+  firstName     String          @map("first_name") @db.VarChar
+  middleName    String?         @map("middle_name") @db.VarChar
+  email         String          @unique @db.VarChar
+  authProvider  AuthProvider    @map("auth_provider")
+  role          AccountRole?
+  passwordHash  String?         @map("password_hash") @db.VarChar(255)
+  status        AccountStatus   @default(ACTIVE)
+  createdAt     DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime?       @default(now()) @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  applicant             Applicant?
+  escalationFromAgent   EscalationTicketAudit[] @relation("escalation_from_agent")
+  escalationToAgent     EscalationTicketAudit[] @relation("escalation_to_agent")
+  ticketMessages        TicketMessage[]
+  ticketsAsAgent        Ticket[]                @relation("tickets_agent")
+  ticketsAsApplicant    Ticket[]                @relation("tickets_applicant")
+
+  @@map("accounts")
+}
+
+model Applicant {
+  id                         String             @id @db.Uuid
+  snils                      String?            @unique @db.VarChar(14)
+  hasBvi                     Boolean?           @default(false) @map("has_bvi")
+  hasSpecialQuota            Boolean?           @default(false) @map("has_special_quota")
+  hasSeparateQuota           Boolean?           @default(false) @map("has_separate_quota")
+  hasTargetQuota             Boolean?           @default(false) @map("has_target_quota")
+  hasPriorityRight           Boolean?           @default(false) @map("has_priority_right")
+  originalDocumentReceived   Boolean?           @default(false) @map("original_document_received")
+  originalDocumentReceivedAt DateTime?          @map("original_document_received_at") @db.Timestamp(6)
+  
+  applicantPrograms          ApplicantProgram[]
+  account                    Account            @relation(fields: [id], references: [id], onDelete: Cascade)
+  examScores                 ExamScore[]
+
+  @@map("applicants")
+}
+
+model ApplicantProgram {
+  id            BigInt        @id @default(autoincrement())
+  applicantId   String        @map("applicant_id") @db.Uuid
+  programId     Int           @map("program_id")
+  programCode   String        @map("program_code") @db.VarChar(20)
+  studyForm     StudyForm     @map("study_form")
+  admissionType AdmissionType @map("admission_type")
+  priority      Int           @db.SmallInt
+  
+  applicant     Applicant     @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@map("applicant_programs")
+}
+
+model EscalationTicketAudit {
+  id            BigInt          @id @default(autoincrement())
+  ticketId      String          @map("ticket_id") @db.Uuid
+  fromAgentId   String          @map("from_agent_id") @db.Uuid
+  toAgentId     String          @map("to_agent_id") @db.Uuid
+  cause         EscalationCause
+  causeComment  String?         @map("cause_comment")
+  escalatedAt   DateTime?       @default(now()) @map("escalated_at") @db.Timestamp(6)
+  acceptedAt    DateTime?       @map("accepted_at") @db.Timestamp(6)
+  
+  fromAgent     Account         @relation("escalation_from_agent", fields: [fromAgentId], references: [id])
+  toAgent       Account         @relation("escalation_to_agent", fields: [toAgentId], references: [id])
+  ticket        Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([fromAgentId], map: "idx_escalation_from")
+  @@map("escalation_ticket_audit")
+}
+
+model ExamScore {
+  id           BigInt    @id @default(autoincrement())
+  applicantId  String    @map("applicant_id") @db.Uuid
+  subjectName  String    @map("subject_name") @db.VarChar(100)
+  score        Int
+  type         ExamType?
+  
+  applicant    Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@map("exam_scores")
+}
+
+model TicketMessage {
+  id           BigInt          @id @default(autoincrement())
+  ticketId     String          @map("ticket_id") @db.Uuid
+  authorId     String          @map("author_id") @db.Uuid
+  authorType   MessageType     @map("author_type")
+  content      String
+  status       DeliveryStatus? @default(SENT)
+  deliveredAt  DateTime?       @map("delivered_at") @db.Timestamp(6)
+  seenAt       DateTime?       @map("seen_at") @db.Timestamp(6)
+  createdAt    DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
+  
+  author       Account         @relation(fields: [authorId], references: [id])
+  ticket       Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_messages")
+}
+
+model Ticket {
+  id                String                   @id @db.Uuid
+  applicantId       String                   @map("applicant_id") @db.Uuid
+  agentId           String?                  @map("agent_id") @db.Uuid
+  status            TicketStatus             @default(NEW)
+  priority          Int?                     @default(0) @db.SmallInt
+  intent            AdmissionIntentCategory?
+  noteText          String                   @map("note_text")
+  assignedAt        DateTime?                @map("assigned_at") @db.Timestamp(6)
+  firstReplyAt      DateTime?                @map("first_reply_at") @db.Timestamp(6)
+  resolvedAt        DateTime?                @map("resolved_at") @db.Timestamp(6)
+  closedAt          DateTime?                @map("closed_at") @db.Timestamp(6)
+  satisfactionScore SatisfactionScore?       @map("satisfaction_score")
+  createdAt         DateTime?                @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime?                @default(now()) @map("updated_at") @db.Timestamp(6)
+  
+  escalations       EscalationTicketAudit[]
+  messages          TicketMessage[]
+  agent             Account?                 @relation("tickets_agent", fields: [agentId], references: [id])
+  applicant         Account                  @relation("tickets_applicant", fields: [applicantId], references: [id])
+
+  @@map("tickets")
+}
+
+// Enums (остаются без изменений, так как они обычно в UPPER_CASE)
+
+enum AccountRole {
+  ADMIN
+  OPERATOR
+  SUPERVISOR
+  APPLICANT
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AdmissionIntentCategory {
+  TECHNICAL_ISSUES
+  DEADLINES_TIMELINES
+  DOCUMENT_SUBMISSION
+  STATUS_VERIFICATION
+  SCORES_COMPETITION
+  PAYMENTS_CONTRACTS
+  ENROLLMENT
+  DORMITORY_HOUSING
+  STUDIES_SCHEDULE
+  EVENTS
+  GENERAL_INFO
+  PROGRAM_CONSULTATION
+}
+
+enum AdmissionType {
+  BUDGET_COMPETITIVE
+  BUDGET_BVI
+  BUDGET_SPECIAL_QUOTA
+  BUDGET_SEPARATE_QUOTA
+  TARGET
+  PAID
+}
+
+enum AuthProvider {
+  INTERNAL
+  EXTERNAL
+}
+
+enum DeliveryStatus {
+  SENT
+  DELIVERED
+  SEEN
+}
+
+enum EscalationCause {
+  COMPLEX_ISSUE
+  INSUFFICIENT_RIGHTS
+  CUSTOMER_COMPLAINT
+  TECHNICAL_FAILURE
+  TIMEOUT
+  OTHER
+}
+
+enum ExamType {
+  EGE
+  INTERNAL
+}
+
+enum MessageType {
+  FROM_CUSTOMER
+  FROM_AGENT
+  SYSTEM
+}
+
+enum SatisfactionScore {
+  TERRIBLE
+  POOR
+  AVERAGE
+  GOOD
+  EXCELLENT
+}
+
+enum StudyForm {
+  FULL_TIME
+  PART_TIME
+  EVENING
+}
+
+enum TicketStatus {
+  NEW
+  IN_PROGRESS
+  ESCALATED
+  RESOLVED
+  CLOSED
+  AWAITING_FEEDBACK
+}
