@@ -6,6 +6,10 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 async function bootstrap() {
+  (BigInt.prototype as any).toJSON = function () {
+    return this.toString();
+  };
+
   const app = await NestFactory.create(AppModule);
 
   const config = new DocumentBuilder()
