@@ -12,6 +12,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  app.setGlobalPrefix('api');
+
+  app.enableCors();
+
   const config = new DocumentBuilder()
     .setTitle('Admission Service Support API')
     .setDescription('API documentation')
