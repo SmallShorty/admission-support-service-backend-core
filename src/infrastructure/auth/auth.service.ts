@@ -41,7 +41,7 @@ export class AuthService {
 
     return {
       account: accountWithoutPassword,
-      token,
+      accessToken: token,
     };
   }
 
