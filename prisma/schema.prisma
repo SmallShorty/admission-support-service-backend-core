@@ -118,7 +118,7 @@ model TicketMessage {
   @@index([ticketId, createdAt])
   @@index([authorId])
 
-   @@map("ticket_messages")
+  @@map("ticket_messages")
 }
 
 model Ticket {
