@@ -36,5 +36,13 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, documentFactory);
 
   await app.listen(process.env.PORT ?? 3000);
+
+  const address = app.getHttpServer().address();
+  const host = address.address === '::' ? 'localhost' : address.address;
+  const serverUrl = `http://${host}:${address.port}`;
+  const swaggerUrl = `${serverUrl}/api`;
+
+  console.log(`Server is running on: ${serverUrl}`);
+  console.log(`Swagger documentation: ${swaggerUrl}`);
 }
 bootstrap();
