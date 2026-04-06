@@ -24,8 +24,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    console.log(password, account.passwordHash);
-
     const isPasswordValid = await bcrypt.compare(
       password,
       account.passwordHash,
@@ -35,18 +33,62 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = this.generateToken(account.id, account.email);
+    const tokens = await this.generateTokens(account.id, account.email);
 
     const { passwordHash: _, ...accountWithoutPassword } = account;
 
     return {
       account: accountWithoutPassword,
-      accessToken: token,
+      ...tokens,
     };
   }
 
-  private generateToken(accountId: string, email: string) {
+  async refreshTokens(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.jwtService['secret'],
+      });
+
+      const account = await this.accountService.account({ id: payload.sub });
+
+      if (!account) {
+        throw new UnauthorizedException('Account not found');
+      }
+
+      const tokens = await this.generateTokens(account.id, account.email);
+
+      const { passwordHash: _, ...accountWithoutPassword } = account;
+
+      return {
+        account: accountWithoutPassword,
+        ...tokens,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  private async generateTokens(accountId: string, email: string) {
     const payload = { sub: accountId, email };
-    return this.jwtService.sign(payload);
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, { expiresIn: '15m' }),
+      this.jwtService.signAsync(payload, { expiresIn: '7d' }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async logout(accessToken: string, refreshToken?: string) {
+    try {
+      return {
+        message: 'Logged out successfully',
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Error during logout');
+    }
   }
 }

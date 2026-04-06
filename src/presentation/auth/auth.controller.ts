@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Req,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -18,12 +27,36 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Account login' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('refresh')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiBody({ schema: { properties: { refreshToken: { type: 'string' } } } })
+  @ApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token' })
+  async refresh(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refreshTokens(refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Logout user' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async logout(@Req() req) {
+    const accessToken = req.headers.authorization?.split(' ')[1];
+    return this.authService.logout(accessToken, req.user.id);
   }
 
   @Get('profile')
