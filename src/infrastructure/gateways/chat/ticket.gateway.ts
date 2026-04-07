@@ -166,6 +166,19 @@ export class TicketChatGateway
       timestamp: new Date(),
     });
 
+    // Also update queue lists with new lastMessageAt
+    this.server.to('queue:available').emit('queueUpdated', {
+      action: 'updated',
+      ticket: ticket,
+      timestamp: new Date(),
+    });
+
+    this.server.to('queue:all').emit('allQueueUpdated', {
+      action: 'updated',
+      ticket: ticket,
+      timestamp: new Date(),
+    });
+
     // If ticket was reassigned, notify old and new agents
     if (ticket.agentId) {
       this.server.to(`user:${ticket.agentId}`).emit('ticketAssigned', {

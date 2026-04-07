@@ -26,6 +26,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from 'src/shared/decorators/roles.decorator';
 import { TicketChatGateway } from 'src/infrastructure/gateways/chat/ticket.gateway';
+import {
+  GetTicketsQueryDto,
+  EscalateTicketRequestDto,
+  UpdateTicketStatusDto,
+  TicketListResponseDto,
+  TicketDetailResponseDto,
+  TicketCountsResponseDto,
+} from 'src/application/dto/tickets/index';
 
 @ApiTags('Tickets')
 @ApiBearerAuth('JWT-auth')
@@ -46,24 +54,7 @@ export class TicketController {
   @ApiResponse({
     status: 200,
     description: 'Returns list of active tickets',
-    schema: {
-      example: {
-        items: [
-          {
-            id: '123e4567-e89b-12d3-a456-426614174000',
-            status: 'IN_PROGRESS',
-            priority: 5,
-            applicant: {
-              id: '123e4567-e89b-12d3-a456-426614174001',
-              firstName: 'John',
-              lastName: 'Doe',
-              email: 'john@example.com',
-            },
-            updatedAt: '2024-01-15T10:30:00Z',
-          },
-        ],
-      },
-    },
+    type: [TicketListResponseDto],
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMyTickets(@Req() req) {
@@ -99,15 +90,19 @@ export class TicketController {
         items: [
           {
             id: '123e4567-e89b-12d3-a456-426614174000',
-            status: 'NEW',
-            priority: 5,
             applicant: {
               id: '123e4567-e89b-12d3-a456-426614174001',
+              name: 'John Doe',
               firstName: 'John',
               lastName: 'Doe',
               email: 'john@example.com',
             },
+            operator: { id: null },
+            category: 'DOCUMENT_SUBMISSION',
+            status: 'NEW',
+            priorityValue: 5,
             createdAt: '2024-01-15T10:30:00Z',
+            lastMessageAt: '2024-01-15T10:30:00Z',
           },
         ],
         total: 25,
@@ -174,21 +169,19 @@ export class TicketController {
         items: [
           {
             id: '123e4567-e89b-12d3-a456-426614174000',
-            status: 'IN_PROGRESS',
-            priority: 5,
             applicant: {
               id: '123e4567-e89b-12d3-a456-426614174001',
+              name: 'John Doe',
               firstName: 'John',
               lastName: 'Doe',
               email: 'john@example.com',
             },
-            agent: {
-              id: '123e4567-e89b-12d3-a456-426614174002',
-              firstName: 'Jane',
-              lastName: 'Smith',
-              email: 'jane@example.com',
-            },
+            operator: { id: '123e4567-e89b-12d3-a456-426614174002' },
+            category: 'DOCUMENT_SUBMISSION',
+            status: 'IN_PROGRESS',
+            priorityValue: 5,
             createdAt: '2024-01-15T10:30:00Z',
+            lastMessageAt: '2024-01-15T10:35:00Z',
           },
         ],
         total: 100,
@@ -210,7 +203,6 @@ export class TicketController {
     @Query('status') status?: string,
     @Query('agentId') agentId?: string,
   ) {
-    const accountId = req.user.id;
     const accountRole = req.user.role;
     const limitNum = limit ? parseInt(limit, 10) : 50;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
@@ -221,13 +213,103 @@ export class TicketController {
     }
 
     return this.ticketService.getAllQueue(
-      accountId,
       accountRole,
       limitNum,
       offsetNum,
       statusArray,
       agentId,
     );
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Get paginated tickets with filters',
+    description:
+      'Universal paginated endpoint for Kanban columns. Supports filtering by status and agentId',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: TicketStatus,
+    description: 'Filter by ticket status',
+  })
+  @ApiQuery({
+    name: 'agentId',
+    required: false,
+    type: String,
+    description: 'Filter by agent ID (Admin/Supervisor only)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (max 100)',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: Number,
+    description: 'Number of items to skip',
+    example: 0,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns paginated list of tickets',
+    schema: {
+      example: {
+        items: [
+          {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            applicant: {
+              id: '123e4567-e89b-12d3-a456-426614174001',
+              name: 'John Doe',
+              firstName: 'John',
+              lastName: 'Doe',
+              email: 'john@example.com',
+            },
+            operator: { id: '123e4567-e89b-12d3-a456-426614174002' },
+            category: 'DOCUMENT_SUBMISSION',
+            status: 'IN_PROGRESS',
+            priorityValue: 5,
+            createdAt: '2024-01-15T10:30:00Z',
+            lastMessageAt: '2024-01-15T10:35:00Z',
+          },
+        ],
+        total: 100,
+        hasMore: true,
+        offset: 0,
+        limit: 20,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getTickets(@Req() req, @Query() query: GetTicketsQueryDto) {
+    const accountId = req.user.id;
+    const accountRole = req.user.role;
+
+    return this.ticketService.getTicketsPaginated(accountId, accountRole, {
+      status: query.status,
+      agentId: query.agentId,
+      limit: query.limit,
+      offset: query.offset,
+    });
+  }
+
+  @Get('counts')
+  @ApiOperation({
+    summary: 'Get ticket counts by status',
+    description:
+      'Returns ticket counts aggregated by status for UI header counters',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns counts per status',
+    type: TicketCountsResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getTicketCounts() {
+    return this.ticketService.getTicketCounts();
   }
 
   @Post(':id/take')
@@ -245,20 +327,7 @@ export class TicketController {
   @ApiResponse({
     status: 200,
     description: 'Ticket successfully taken',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        status: 'IN_PROGRESS',
-        agentId: '123e4567-e89b-12d3-a456-426614174002',
-        assignedAt: '2024-01-15T10:35:00Z',
-        applicant: {
-          id: '123e4567-e89b-12d3-a456-426614174001',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john@example.com',
-        },
-      },
-    },
+    type: TicketListResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Ticket not available for taking' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -315,18 +384,25 @@ export class TicketController {
       },
     },
   })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket successfully escalated',
+    type: TicketListResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid escalation request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Not assigned to this ticket' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
   async escalateTicket(
     @Param('id') ticketId: string,
     @Req() req,
-    @Body() body: { toAgentId: string; cause: string; causeComment?: string },
+    @Body() body: EscalateTicketRequestDto,
   ) {
     const fromAgentId = req.user.id;
     const ticket = await this.ticketService.escalateTicket(
       ticketId,
       fromAgentId,
-      body.toAgentId,
-      body.cause,
-      body.causeComment,
+      body,
     );
 
     // Emit WebSocket updates
@@ -340,7 +416,7 @@ export class TicketController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Update ticket status',
-    description: 'Changes the status of a ticket (RESOLVED, CLOSED, etc.)',
+    description: 'Changes the status of a ticket (RESOLVED or CLOSED)',
   })
   @ApiParam({
     name: 'id',
@@ -363,20 +439,9 @@ export class TicketController {
   @ApiResponse({
     status: 200,
     description: 'Ticket status updated successfully',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        status: 'RESOLVED',
-        resolvedAt: '2024-01-15T11:00:00Z',
-        applicant: {
-          id: '123e4567-e89b-12d3-a456-426614174001',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john@example.com',
-        },
-      },
-    },
+    type: TicketListResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'Invalid status transition' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({
     status: 403,
@@ -386,7 +451,7 @@ export class TicketController {
   async updateTicketStatus(
     @Param('id') ticketId: string,
     @Req() req,
-    @Body() body: { status: TicketStatus },
+    @Body() body: UpdateTicketStatusDto,
   ) {
     const accountId = req.user.id;
     const ticket = await this.ticketService.updateTicketStatus(
@@ -405,7 +470,8 @@ export class TicketController {
   @Get(':id')
   @ApiOperation({
     summary: 'Get ticket by ID',
-    description: 'Returns detailed information about a specific ticket',
+    description:
+      'Returns detailed information about a specific ticket with 360-degree data',
   })
   @ApiParam({
     name: 'id',
@@ -414,34 +480,14 @@ export class TicketController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Returns ticket details',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        status: 'IN_PROGRESS',
-        priority: 5,
-        noteText: 'User has issues with document submission',
-        applicant: {
-          id: '123e4567-e89b-12d3-a456-426614174001',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john@example.com',
-        },
-        agent: {
-          id: '123e4567-e89b-12d3-a456-426614174002',
-          firstName: 'Jane',
-          lastName: 'Smith',
-          email: 'jane@example.com',
-        },
-        createdAt: '2024-01-15T10:30:00Z',
-        updatedAt: '2024-01-15T10:35:00Z',
-      },
-    },
+    description:
+      'Returns ticket details with applicant profile, exam scores, and programs',
+    type: TicketDetailResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async getTicketById(@Param('id') ticketId: string) {
-    return this.ticketService.getTicketById(ticketId);
+    return this.ticketService.getTicketDetails(ticketId);
   }
 
   @Get(':id/messages')

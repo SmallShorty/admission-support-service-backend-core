@@ -1,38 +1,313 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { MessageType, TicketStatus, AccountRole } from 'generated/prisma/enums';
+import {
+  MessageType,
+  TicketStatus,
+  AccountRole,
+  EscalationCause,
+} from 'generated/prisma/enums';
 import { Prisma } from 'generated/prisma/client';
+
+// ========== Domain Exceptions ==========
+export class TicketNotFoundException extends NotFoundException {
+  constructor(ticketId?: string) {
+    super(ticketId ? `Ticket ${ticketId} not found` : 'Ticket not found');
+  }
+}
+
+export class TicketNotAssignableException extends BadRequestException {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class UnauthorizedTicketAccessException extends ForbiddenException {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+// ========== DTOs ==========
+export interface SaveMessageDto {
+  ticketId: string;
+  authorId: string;
+  content: string;
+  authorType: MessageType;
+}
+
+export interface EscalateTicketDto {
+  toAgentId: string;
+  cause: EscalationCause;
+  causeComment?: string;
+}
+
+export interface TicketFiltersDto {
+  status?: TicketStatus;
+  agentId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  hasMore: boolean;
+  offset: number;
+  limit: number;
+}
+
+export interface TicketListResponse {
+  id: string;
+  applicant: {
+    id: string;
+    name: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string;
+    email: string;
+  };
+  operator: {
+    id: string | null;
+  };
+  category: string | null;
+  status: TicketStatus;
+  priorityValue: number | null;
+  createdAt: string;
+  lastMessageAt: string;
+}
+
+export interface TicketDetailResponse extends TicketListResponse {
+  noteText: string;
+  intent: string | null;
+  assignedAt: string | null;
+  firstReplyAt: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  updatedAt: string;
+  examScores?: Array<{
+    subjectName: string;
+    score: number;
+    type: string | null;
+  }>;
+  applicantPrograms?: Array<{
+    programId: number;
+    programCode: string;
+    studyForm: string;
+    admissionType: string;
+    priority: number;
+  }>;
+}
 
 @Injectable()
 export class TicketService {
+  private readonly logger = new Logger(TicketService.name);
+
+  // Reusable select fields for consistent data fetching
+  private readonly applicantSelectFields = {
+    id: true,
+    firstName: true,
+    lastName: true,
+    middleName: true,
+    email: true,
+  };
+
+  private readonly agentSelectFields = {
+    id: true,
+    firstName: true,
+    lastName: true,
+    email: true,
+  };
+
   constructor(private prisma: PrismaService) {}
 
+  // ========== Helper Methods ==========
+
+  /**
+   * Normalizes pagination parameters with safe defaults
+   */
+  private normalizePagination(
+    limit?: number,
+    offset?: number,
+  ): { take: number; skip: number } {
+    const take = Math.min(Math.abs(Number(limit || 50)), 100);
+    const skip = Math.max(0, Number(offset || 0));
+    return { take, skip };
+  }
+
+  /**
+   * Creates a standardized paginated response
+   */
+  private createPaginatedResponse<T>(
+    items: T[],
+    total: number,
+    skip: number,
+    take: number,
+  ): PaginatedResult<T> {
+    return {
+      items,
+      total,
+      hasMore: skip + items.length < total,
+      offset: skip,
+      limit: take,
+    };
+  }
+
+  /**
+   * Validates that the user has Admin or Supervisor role
+   */
+  private validateAdminOrSupervisor(role: AccountRole | null): void {
+    if (role !== AccountRole.ADMIN && role !== AccountRole.SUPERVISOR) {
+      throw new ForbiddenException(
+        'Access denied. Admin or Supervisor role required.',
+      );
+    }
+  }
+
+  /**
+   * Validates that an agent exists and can take tickets
+   */
+  private async validateAgentCanTakeTicket(agentId: string): Promise<void> {
+    const agent = await this.prisma.account.findUnique({
+      where: { id: agentId },
+      select: { id: true, role: true, status: true },
+    });
+
+    if (!agent) {
+      throw new BadRequestException(`Agent ${agentId} not found`);
+    }
+
+    if (agent.status !== 'ACTIVE') {
+      throw new BadRequestException(`Agent ${agentId} is not active`);
+    }
+
+    // Check if role exists and is allowed
+    if (!agent.role) {
+      throw new BadRequestException('Agent must have a role assigned');
+    }
+
+    const allowedRoles: AccountRole[] = [
+      AccountRole.OPERATOR,
+      AccountRole.SUPERVISOR,
+      AccountRole.ADMIN,
+    ];
+    if (!allowedRoles.includes(agent.role)) {
+      throw new BadRequestException(
+        'Agent must be OPERATOR, SUPERVISOR, or ADMIN',
+      );
+    }
+  }
+
+  /**
+   * Validates that a target agent exists for escalation
+   */
+  private async validateTargetAgentForEscalation(
+    agentId: string,
+  ): Promise<void> {
+    const agent = await this.prisma.account.findUnique({
+      where: { id: agentId },
+      select: { id: true, role: true, status: true },
+    });
+
+    if (!agent) {
+      throw new BadRequestException(`Target agent ${agentId} not found`);
+    }
+
+    if (agent.status !== 'ACTIVE') {
+      throw new BadRequestException(`Target agent ${agentId} is not active`);
+    }
+
+    // Check if role exists and is allowed for escalation
+    if (!agent.role) {
+      throw new BadRequestException('Target agent must have a role assigned');
+    }
+
+    const allowedRoles: AccountRole[] = [
+      AccountRole.SUPERVISOR,
+      AccountRole.ADMIN,
+    ];
+    if (!allowedRoles.includes(agent.role)) {
+      throw new BadRequestException('Target agent must be SUPERVISOR or ADMIN');
+    }
+  }
+
+  /**
+   * Formats full name from account fields
+   */
+  private getFullName(account: {
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+  }): string {
+    const parts = [
+      account.lastName,
+      account.firstName,
+      account.middleName,
+    ].filter(Boolean);
+    return parts.join(' ');
+  }
+
+  /**
+   * Transforms a ticket entity to TicketListResponse format
+   */
+  private toTicketListResponse(ticket: any): TicketListResponse {
+    return {
+      id: ticket.id,
+      applicant: {
+        id: ticket.applicant.id,
+        name: this.getFullName(ticket.applicant),
+        firstName: ticket.applicant.firstName,
+        lastName: ticket.applicant.lastName,
+        middleName: ticket.applicant.middleName || undefined,
+        email: ticket.applicant.email,
+      },
+      operator: {
+        id: ticket.agentId || null,
+      },
+      category: ticket.intent,
+      status: ticket.status,
+      priorityValue: ticket.priority,
+      createdAt: ticket.createdAt?.toISOString() || new Date().toISOString(),
+      lastMessageAt:
+        ticket.lastMessageAt?.toISOString() ||
+        ticket.createdAt?.toISOString() ||
+        new Date().toISOString(),
+    };
+  }
+
+  // ========== WebSocket Connection Management ==========
+
   async addConnection(accountId: string, socketId: string) {
-    console.log('New connection attempt:', accountId);
+    this.logger.log(
+      `Adding WebSocket connection for account ${accountId}, socket ${socketId}`,
+    );
     return this.prisma.userConnection.create({
       data: { accountId, socketId },
     });
   }
 
   async removeConnection(socketId: string) {
-    console.log('Removing connection for socket:', socketId);
+    this.logger.log(`Removing WebSocket connection for socket ${socketId}`);
     return this.prisma.userConnection.deleteMany({
       where: { socketId },
     });
   }
 
-  async saveMessage(data: {
-    ticketId: string;
-    authorId: string;
-    content: string;
-    authorType: MessageType;
-  }) {
-    console.log('START TRANSACTION: saveMessage');
-    console.log('Payload received:', JSON.stringify(data, null, 2));
+  // ========== Message Management ==========
+
+  async saveMessage(data: SaveMessageDto) {
+    this.logger.log(
+      `Saving message for ticket ${data.ticketId} from author ${data.authorId}`,
+    );
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        console.log(`Creating message in ticket: ${data.ticketId}`);
+        // Create the message
         const message = await tx.ticketMessage.create({
           data: {
             ticketId: data.ticketId,
@@ -42,23 +317,31 @@ export class TicketService {
             status: 'SENT',
           },
         });
-        console.log('Message created successfully. ID:', message.id);
+        this.logger.debug(`Message created with ID: ${message.id}`);
 
-        console.log(`Updating updatedAt for ticket: ${data.ticketId}`);
+        // Update ticket timestamps
         await tx.ticket.update({
           where: { id: data.ticketId },
-          data: { updatedAt: new Date() },
+          data: {
+            updatedAt: new Date(),
+            lastMessageAt: new Date(),
+            // Set firstReplyAt if this is the first agent response
+            ...(data.authorType === 'FROM_AGENT' && {
+              firstReplyAt: new Date(),
+            }),
+          },
         });
-        console.log('Ticket updatedAt refreshed');
+        this.logger.debug(`Ticket ${data.ticketId} timestamps updated`);
 
         return message;
       });
 
-      console.log('TRANSACTION COMMITTED SUCCESSFULLY');
+      this.logger.log(`Message saved successfully for ticket ${data.ticketId}`);
       return result;
     } catch (error) {
-      console.error('TRANSACTION FAILED');
-      console.error('Error details:', error);
+      this.logger.error(
+        `Failed to save message for ticket ${data.ticketId}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -68,19 +351,15 @@ export class TicketService {
     cursor?: string,
     limit: number = 50,
   ) {
-    console.log(
-      'Fetching messages for ticket:',
-      ticketId,
-      'cursor:',
-      cursor,
-      'limit:',
-      limit,
+    this.logger.log(
+      `Fetching messages for ticket ${ticketId}, cursor: ${cursor}, limit: ${limit}`,
     );
 
     const take = Math.min(Math.abs(Number(limit)), 100);
 
     const where: Prisma.TicketMessageWhereInput = { ticketId };
 
+    // Cursor-based pagination using message ID
     if (cursor && !isNaN(Number(cursor))) {
       where.id = { lt: BigInt(cursor) };
     }
@@ -91,12 +370,7 @@ export class TicketService {
       orderBy: { createdAt: 'desc' },
       include: {
         author: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
+          select: this.applicantSelectFields,
         },
       },
     });
@@ -107,6 +381,7 @@ export class TicketService {
         ? messages[messages.length - 1].id.toString()
         : null;
 
+    // Return messages in chronological order (oldest first)
     return {
       items: messages.reverse(),
       hasMore,
@@ -114,10 +389,19 @@ export class TicketService {
     };
   }
 
-  async getMyTickets(accountId: string) {
-    console.log('Getting my tickets for account:', accountId);
+  async getTicketMessagesCount(ticketId: string): Promise<number> {
+    this.logger.log(`Getting message count for ticket ${ticketId}`);
+    return this.prisma.ticketMessage.count({
+      where: { ticketId },
+    });
+  }
 
-    return this.prisma.ticket.findMany({
+  // ========== Ticket Queries ==========
+
+  async getMyTickets(accountId: string) {
+    this.logger.log(`Getting active tickets for agent ${accountId}`);
+
+    const tickets = await this.prisma.ticket.findMany({
       where: {
         agentId: accountId,
         status: {
@@ -126,12 +410,7 @@ export class TicketService {
       },
       include: {
         applicant: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
+          select: this.applicantSelectFields,
         },
         messages: {
           orderBy: { createdAt: 'desc' },
@@ -140,6 +419,8 @@ export class TicketService {
       },
       orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
     });
+
+    return tickets.map((ticket) => this.toTicketListResponse(ticket));
   }
 
   async getAvailableQueue(
@@ -147,75 +428,60 @@ export class TicketService {
     limit: number = 50,
     offset: number = 0,
   ) {
-    console.log('Getting available queue for account:', accountId);
+    this.logger.log(`Getting available queue for agent ${accountId}`);
 
-    // Convert to numbers and ensure they're valid
-    const take = Math.min(Math.abs(Number(limit)), 100);
-    const skip = Math.max(0, Number(offset));
+    const { take, skip } = this.normalizePagination(limit, offset);
 
-    const tickets = await this.prisma.ticket.findMany({
-      where: {
-        status: TicketStatus.NEW,
-        agentId: null,
-      },
-      include: {
-        applicant: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+    // Parallel queries for better performance
+    const [tickets, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where: {
+          status: TicketStatus.NEW,
+          agentId: null,
+        },
+        include: {
+          applicant: {
+            select: this.applicantSelectFields,
           },
         },
-      },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
-      take,
-      skip,
-    });
+        orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        take,
+        skip,
+      }),
+      this.prisma.ticket.count({
+        where: {
+          status: TicketStatus.NEW,
+          agentId: null,
+        },
+      }),
+    ]);
 
-    const total = await this.prisma.ticket.count({
-      where: {
-        status: TicketStatus.NEW,
-        agentId: null,
-      },
-    });
-
-    return {
-      items: tickets,
+    return this.createPaginatedResponse(
+      tickets.map((ticket) => this.toTicketListResponse(ticket)),
       total,
-      hasMore: skip + tickets.length < total,
-      offset: skip,
-      limit: take,
-    };
+      skip,
+      take,
+    );
   }
 
   async getAllQueue(
-    accountId: string,
-    accountRole: AccountRole,
+    accountRole: AccountRole | null,
     limit: number = 50,
     offset: number = 0,
     status?: TicketStatus[],
     agentId?: string,
   ) {
-    console.log(
-      'Getting all queue for account:',
-      accountId,
-      'role:',
-      accountRole,
-    );
+    this.logger.log(`Getting all queue for role ${accountRole}`);
 
-    if (
-      accountRole !== AccountRole.ADMIN &&
-      accountRole !== AccountRole.SUPERVISOR
-    ) {
-      throw new ForbiddenException(
-        'Access denied. Admin or Supervisor role required.',
-      );
+    // Role validation
+    this.validateAdminOrSupervisor(accountRole);
+
+    const { take, skip } = this.normalizePagination(limit, offset);
+
+    // Validate agent exists if filtering by agentId
+    if (agentId) {
+      await this.validateAgentCanTakeTicket(agentId);
     }
-
-    // Convert to numbers and ensure they're valid
-    const take = Math.min(Math.abs(Number(limit)), 100);
-    const skip = Math.max(0, Number(offset));
 
     const where: Prisma.TicketWhereInput = {};
 
@@ -227,44 +493,220 @@ export class TicketService {
       where.agentId = agentId;
     }
 
-    const tickets = await this.prisma.ticket.findMany({
-      where,
+    // Parallel queries for better performance
+    const [tickets, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        include: {
+          applicant: {
+            select: this.applicantSelectFields,
+          },
+          agent: {
+            select: this.agentSelectFields,
+          },
+        },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+        take,
+        skip,
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+
+    return this.createPaginatedResponse(
+      tickets.map((ticket) => this.toTicketListResponse(ticket)),
+      total,
+      skip,
+      take,
+    );
+  }
+
+  async getTicketsPaginated(
+    accountId: string,
+    accountRole: AccountRole | null,
+    filters: TicketFiltersDto,
+  ): Promise<PaginatedResult<TicketListResponse>> {
+    this.logger.log(
+      `Getting paginated tickets for account ${accountId}, role ${accountRole}`,
+    );
+
+    const { take, skip } = this.normalizePagination(
+      filters.limit,
+      filters.offset,
+    );
+
+    const where: Prisma.TicketWhereInput = {};
+
+    // Apply status filter
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    // Role-based access control
+    if (accountRole === AccountRole.OPERATOR) {
+      // Operators see their own tickets, except NEW tickets which are unassigned
+      if (filters.status !== TicketStatus.NEW) {
+        where.agentId = accountId;
+      }
+    } else if (
+      accountRole === AccountRole.ADMIN ||
+      accountRole === AccountRole.SUPERVISOR
+    ) {
+      // Admins and supervisors can filter by agentId
+      if (filters.agentId) {
+        where.agentId = filters.agentId;
+      }
+    }
+
+    // Parallel queries for better performance
+    const [tickets, total] = await Promise.all([
+      this.prisma.ticket.findMany({
+        where,
+        include: {
+          applicant: {
+            select: this.applicantSelectFields,
+          },
+          agent: {
+            select: this.agentSelectFields,
+          },
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
+        orderBy: [
+          { priority: 'desc' },
+          { lastMessageAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        take,
+        skip,
+      }),
+      this.prisma.ticket.count({ where }),
+    ]);
+
+    return this.createPaginatedResponse(
+      tickets.map((ticket) => this.toTicketListResponse(ticket)),
+      total,
+      skip,
+      take,
+    );
+  }
+
+  async getTicketCounts(): Promise<Record<TicketStatus, number>> {
+    this.logger.log('Getting ticket counts by status');
+
+    const counts = await this.prisma.ticket.groupBy({
+      by: ['status'],
+      _count: { status: true },
+    });
+
+    // Initialize all statuses with 0
+    const result: Partial<Record<TicketStatus, number>> = {};
+    for (const status of Object.values(TicketStatus)) {
+      result[status] = 0;
+    }
+
+    // Fill in actual counts
+    for (const { status, _count } of counts) {
+      result[status] = _count.status;
+    }
+
+    return result as Record<TicketStatus, number>;
+  }
+
+  async getTicketById(ticketId: string): Promise<TicketListResponse> {
+    this.logger.log(`Getting ticket by ID: ${ticketId}`);
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        applicant: {
+          select: this.applicantSelectFields,
+        },
+        agent: {
+          select: this.agentSelectFields,
+        },
+      },
+    });
+
+    if (!ticket) {
+      throw new TicketNotFoundException(ticketId);
+    }
+
+    return this.toTicketListResponse(ticket);
+  }
+
+  // TODO Refactor
+  async getTicketDetails(ticketId: string): Promise<TicketDetailResponse> {
+    this.logger.log(`Getting detailed ticket info for ${ticketId}`);
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
       include: {
         applicant: {
           select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+            ...this.applicantSelectFields,
+            applicant: {
+              include: {
+                examScores: true,
+                applicantPrograms: true,
+              },
+            },
           },
         },
         agent: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
+          select: this.agentSelectFields,
         },
       },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
-      take,
-      skip, // Now skip is a number, not string
     });
 
-    const total = await this.prisma.ticket.count({ where });
+    if (!ticket) {
+      throw new TicketNotFoundException(ticketId);
+    }
+
+    // Handle the nested structure correctly
+    const applicantAccount = ticket.applicant;
+    const applicantData = (ticket.applicant as any).applicant;
+
+    const baseResponse = this.toTicketListResponse({
+      ...ticket,
+      applicant: applicantAccount,
+    });
 
     return {
-      items: tickets,
-      total,
-      hasMore: offset + tickets.length < total,
-      offset: skip,
-      limit: take,
+      ...baseResponse,
+      noteText: ticket.noteText,
+      intent: ticket.intent,
+      assignedAt: ticket.assignedAt?.toISOString() || null,
+      firstReplyAt: ticket.firstReplyAt?.toISOString() || null,
+      resolvedAt: ticket.resolvedAt?.toISOString() || null,
+      closedAt: ticket.closedAt?.toISOString() || null,
+      updatedAt: ticket.updatedAt?.toISOString() || new Date().toISOString(),
+      examScores: applicantData?.examScores?.map((score: any) => ({
+        subjectName: score.subjectName,
+        score: score.score,
+        type: score.type,
+      })),
+      applicantPrograms: applicantData?.applicantPrograms?.map(
+        (program: any) => ({
+          programId: program.programId,
+          programCode: program.programCode,
+          studyForm: program.studyForm,
+          admissionType: program.admissionType,
+          priority: program.priority,
+        }),
+      ),
     };
   }
 
+  // ========== Ticket Mutations ==========
+
   async takeTicket(ticketId: string, accountId: string) {
-    console.log('Taking ticket:', ticketId, 'by account:', accountId);
+    this.logger.log(`Agent ${accountId} attempting to take ticket ${ticketId}`);
+
+    // Validate agent can take tickets
+    await this.validateAgentCanTakeTicket(accountId);
 
     return this.prisma.$transaction(async (tx) => {
       const ticket = await tx.ticket.findUnique({
@@ -272,15 +714,19 @@ export class TicketService {
       });
 
       if (!ticket) {
-        throw new Error('Ticket not found');
+        throw new TicketNotFoundException(ticketId);
       }
 
       if (ticket.status !== TicketStatus.NEW) {
-        throw new Error('Ticket is not available for taking');
+        throw new TicketNotAssignableException(
+          `Ticket ${ticketId} has status ${ticket.status}, expected NEW`,
+        );
       }
 
       if (ticket.agentId !== null) {
-        throw new Error('Ticket is already assigned to another agent');
+        throw new TicketNotAssignableException(
+          `Ticket ${ticketId} is already assigned to agent ${ticket.agentId}`,
+        );
       }
 
       const updatedTicket = await tx.ticket.update({
@@ -293,36 +739,29 @@ export class TicketService {
         },
         include: {
           applicant: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
+            select: this.applicantSelectFields,
           },
         },
       });
 
-      console.log('Ticket taken successfully:', ticketId);
-      return updatedTicket;
+      this.logger.log(
+        `Ticket ${ticketId} successfully taken by agent ${accountId}`,
+      );
+      return this.toTicketListResponse(updatedTicket);
     });
   }
 
   async escalateTicket(
     ticketId: string,
     fromAgentId: string,
-    toAgentId: string,
-    cause: string,
-    causeComment?: string,
+    dto: EscalateTicketDto,
   ) {
-    console.log(
-      'Escalating ticket:',
-      ticketId,
-      'from:',
-      fromAgentId,
-      'to:',
-      toAgentId,
+    this.logger.log(
+      `Escalating ticket ${ticketId} from ${fromAgentId} to ${dto.toAgentId}`,
     );
+
+    // Validate target agent exists and can receive escalation
+    await this.validateTargetAgentForEscalation(dto.toAgentId);
 
     return this.prisma.$transaction(async (tx) => {
       const ticket = await tx.ticket.findUnique({
@@ -330,20 +769,23 @@ export class TicketService {
       });
 
       if (!ticket) {
-        throw new Error('Ticket not found');
+        throw new TicketNotFoundException(ticketId);
       }
 
       if (ticket.agentId !== fromAgentId) {
-        throw new Error('Ticket is not assigned to this agent');
+        throw new UnauthorizedTicketAccessException(
+          `Agent ${fromAgentId} is not assigned to ticket ${ticketId}`,
+        );
       }
 
-      const escalation = await tx.escalationTicketAudit.create({
+      // Create escalation audit record
+      await tx.escalationTicketAudit.create({
         data: {
           ticketId,
           fromAgentId,
-          toAgentId,
-          cause: cause as any,
-          causeComment,
+          toAgentId: dto.toAgentId,
+          cause: dto.cause,
+          causeComment: dto.causeComment,
           escalatedAt: new Date(),
         },
       });
@@ -351,24 +793,21 @@ export class TicketService {
       const updatedTicket = await tx.ticket.update({
         where: { id: ticketId },
         data: {
-          agentId: toAgentId,
+          agentId: dto.toAgentId,
           status: TicketStatus.ESCALATED,
           updatedAt: new Date(),
         },
         include: {
           applicant: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
+            select: this.applicantSelectFields,
           },
         },
       });
 
-      console.log('Ticket escalated successfully:', ticketId);
-      return updatedTicket;
+      this.logger.log(
+        `Ticket ${ticketId} successfully escalated to ${dto.toAgentId}`,
+      );
+      return this.toTicketListResponse(updatedTicket);
     });
   }
 
@@ -377,13 +816,8 @@ export class TicketService {
     accountId: string,
     status: TicketStatus,
   ) {
-    console.log(
-      'Updating ticket status:',
-      ticketId,
-      'to:',
-      status,
-      'by:',
-      accountId,
+    this.logger.log(
+      `Updating ticket ${ticketId} status to ${status} by agent ${accountId}`,
     );
 
     return this.prisma.$transaction(async (tx) => {
@@ -392,11 +826,13 @@ export class TicketService {
       });
 
       if (!ticket) {
-        throw new Error('Ticket not found');
+        throw new TicketNotFoundException(ticketId);
       }
 
       if (ticket.agentId !== accountId) {
-        throw new Error('You are not assigned to this ticket');
+        throw new UnauthorizedTicketAccessException(
+          `Agent ${accountId} is not assigned to ticket ${ticketId}`,
+        );
       }
 
       const data: Prisma.TicketUpdateInput = {
@@ -415,58 +851,13 @@ export class TicketService {
         data,
         include: {
           applicant: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
+            select: this.applicantSelectFields,
           },
         },
       });
 
-      console.log('Ticket status updated successfully:', ticketId);
-      return updatedTicket;
-    });
-  }
-
-  async getTicketById(ticketId: string) {
-    console.log('Getting ticket by id:', ticketId);
-
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id: ticketId },
-      include: {
-        applicant: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        agent: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    if (!ticket) {
-      throw new Error('Ticket not found');
-    }
-
-    return ticket;
-  }
-
-  async getTicketMessagesCount(ticketId: string): Promise<number> {
-    console.log('Getting messages count for ticket:', ticketId);
-
-    return this.prisma.ticketMessage.count({
-      where: { ticketId },
+      this.logger.log(`Ticket ${ticketId} status updated to ${status}`);
+      return this.toTicketListResponse(updatedTicket);
     });
   }
 }
