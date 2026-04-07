@@ -8,6 +8,9 @@ import {
   TicketStatus,
   AdmissionIntentCategory,
   EscalationCause,
+  ExamType,
+  StudyForm,
+  AdmissionType,
 } from 'generated/prisma/client';
 
 const connectionString = `${process.env.DATABASE_URL}`;
@@ -18,7 +21,7 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Start seeding...');
 
-  // Очистка существующих данных (в правильном порядке из-за внешних ключей)
+  // Clean existing data (correct order due to foreign keys)
   console.log('🧹 Cleaning existing data...');
   await prisma.ticketMessage.deleteMany();
   await prisma.escalationTicketAudit.deleteMany();
@@ -31,13 +34,13 @@ async function main() {
 
   console.log('✅ Cleaned existing data');
 
-  // Хеширование паролей
+  // Hash passwords
   const hashedPassword = await bcrypt.hash('admin', 10);
   const hashedUserPassword = await bcrypt.hash('user123', 10);
 
-  // ========== Создание пользователей ==========
+  // ========== Create Users ==========
 
-  // 1. Администратор
+  // 1. Admin
   const admin = await prisma.account.create({
     data: {
       id: '11111111-1111-4111-8111-111111111111',
@@ -53,7 +56,7 @@ async function main() {
   });
   console.log('👑 Created admin:', admin.email);
 
-  // 2. Супервайзер (старший оператор)
+  // 2. Supervisor
   const supervisor = await prisma.account.create({
     data: {
       id: '22222222-2222-4222-8222-222222222222',
@@ -69,7 +72,7 @@ async function main() {
   });
   console.log('👔 Created supervisor:', supervisor.email);
 
-  // 3. Операторы
+  // 3. Operators
   const operator1 = await prisma.account.create({
     data: {
       id: '33333333-3333-4333-8333-333333333333',
@@ -114,7 +117,7 @@ async function main() {
 
   console.log('👨‍💼 Created 3 operators');
 
-  // 4. Абитуриенты (заявители) с расширенными данными
+  // 4. Applicants with extended data
   const applicant1Account = await prisma.account.create({
     data: {
       id: '55555555-5555-4555-8555-555555555555',
@@ -129,7 +132,6 @@ async function main() {
     },
   });
 
-  // Создаем Applicant профиль
   await prisma.applicant.create({
     data: {
       id: applicant1Account.id,
@@ -228,105 +230,105 @@ async function main() {
 
   console.log('📚 Created 4 applicants with profiles');
 
-  // ========== Создание экзаменационных баллов ==========
+  // ========== Create Exam Scores ==========
 
   const examScoresData = [
-    // Алексей Иванов
+    // Alexey Ivanov
     {
       applicantId: applicant1Account.id,
       subjectName: 'Русский язык',
       score: 85,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant1Account.id,
       subjectName: 'Математика',
       score: 92,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant1Account.id,
       subjectName: 'Физика',
       score: 88,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant1Account.id,
       subjectName: 'Информатика',
       score: 78,
-      type: 'INTERNAL',
+      type: ExamType.INTERNAL,
     },
 
-    // Мария Петрова
+    // Maria Petrova
     {
       applicantId: applicant2Account.id,
       subjectName: 'Русский язык',
       score: 94,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant2Account.id,
       subjectName: 'Математика',
       score: 88,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant2Account.id,
       subjectName: 'Обществознание',
       score: 96,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant2Account.id,
       subjectName: 'Английский язык',
       score: 82,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
 
-    // Дмитрий Соколов
+    // Dmitry Sokolov
     {
       applicantId: applicant3Account.id,
       subjectName: 'Русский язык',
       score: 76,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant3Account.id,
       subjectName: 'Математика',
       score: 84,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant3Account.id,
       subjectName: 'Физика',
       score: 79,
-      type: 'INTERNAL',
+      type: ExamType.INTERNAL,
     },
 
-    // Ольга Козлова
+    // Olga Kozlova
     {
       applicantId: applicant4Account.id,
       subjectName: 'Русский язык',
       score: 91,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant4Account.id,
       subjectName: 'Математика',
       score: 87,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant4Account.id,
       subjectName: 'Биология',
       score: 93,
-      type: 'EGE',
+      type: ExamType.EGE,
     },
     {
       applicantId: applicant4Account.id,
       subjectName: 'Химия',
       score: 89,
-      type: 'INTERNAL',
+      type: ExamType.INTERNAL,
     },
   ];
 
@@ -336,70 +338,70 @@ async function main() {
 
   console.log('📊 Created exam scores');
 
-  // ========== Создание программ абитуриентов ==========
+  // ========== Create Applicant Programs ==========
 
   const applicantProgramsData = [
-    // Алексей Иванов
+    // Alexey Ivanov
     {
       applicantId: applicant1Account.id,
       programId: 101,
       programCode: '01.03.02',
-      studyForm: 'FULL_TIME',
-      admissionType: 'BUDGET_COMPETITIVE',
+      studyForm: StudyForm.FULL_TIME,
+      admissionType: AdmissionType.BUDGET_COMPETITIVE,
       priority: 1,
     },
     {
       applicantId: applicant1Account.id,
       programId: 102,
       programCode: '02.03.03',
-      studyForm: 'FULL_TIME',
-      admissionType: 'PAID',
+      studyForm: StudyForm.FULL_TIME,
+      admissionType: AdmissionType.PAID,
       priority: 2,
     },
 
-    // Мария Петрова
+    // Maria Petrova
     {
       applicantId: applicant2Account.id,
       programId: 201,
       programCode: '38.03.01',
-      studyForm: 'FULL_TIME',
-      admissionType: 'BUDGET_SPECIAL_QUOTA',
+      studyForm: StudyForm.FULL_TIME,
+      admissionType: AdmissionType.BUDGET_SPECIAL_QUOTA,
       priority: 1,
     },
     {
       applicantId: applicant2Account.id,
       programId: 202,
       programCode: '38.03.02',
-      studyForm: 'PART_TIME',
-      admissionType: 'PAID',
+      studyForm: StudyForm.PART_TIME,
+      admissionType: AdmissionType.PAID,
       priority: 2,
     },
 
-    // Дмитрий Соколов
+    // Dmitry Sokolov
     {
       applicantId: applicant3Account.id,
       programId: 301,
       programCode: '09.03.01',
-      studyForm: 'FULL_TIME',
-      admissionType: 'BUDGET_BVI',
+      studyForm: StudyForm.FULL_TIME,
+      admissionType: AdmissionType.BUDGET_BVI,
       priority: 1,
     },
     {
       applicantId: applicant3Account.id,
       programId: 302,
       programCode: '09.03.04',
-      studyForm: 'FULL_TIME',
-      admissionType: 'BUDGET_COMPETITIVE',
+      studyForm: StudyForm.FULL_TIME,
+      admissionType: AdmissionType.BUDGET_COMPETITIVE,
       priority: 2,
     },
 
-    // Ольга Козлова
+    // Olga Kozlova
     {
       applicantId: applicant4Account.id,
       programId: 401,
       programCode: '31.05.01',
-      studyForm: 'FULL_TIME',
-      admissionType: 'TARGET',
+      studyForm: StudyForm.FULL_TIME,
+      admissionType: AdmissionType.TARGET,
       priority: 1,
     },
   ];
@@ -410,9 +412,9 @@ async function main() {
 
   console.log('🎓 Created applicant programs');
 
-  // ========== Создание тикетов с lastMessageAt ==========
+  // ========== Create Tickets with lastMessageAt ==========
 
-  // 1. NEW - тикеты в очереди (доступны для взятия)
+  // 1. NEW - tickets in queue (available for taking)
   const newTicket1 = await prisma.ticket.create({
     data: {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -476,7 +478,7 @@ async function main() {
 
   console.log('📋 Created 4 NEW tickets');
 
-  // 2. IN_PROGRESS - тикеты в работе у операторов
+  // 2. IN_PROGRESS - tickets being worked on by operators
   const inProgressTicket1 = await prisma.ticket.create({
     data: {
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
@@ -527,7 +529,7 @@ async function main() {
 
   console.log('🔄 Created 3 IN_PROGRESS tickets');
 
-  // 3. ESCALATED - эскалированные тикеты
+  // 3. ESCALATED - escalated tickets
   const escalatedTicket = await prisma.ticket.create({
     data: {
       id: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
@@ -546,7 +548,7 @@ async function main() {
 
   console.log('⚠️ Created 1 ESCALATED ticket');
 
-  // 4. RESOLVED - решенные тикеты
+  // 4. RESOLVED - resolved tickets
   const resolvedTicket = await prisma.ticket.create({
     data: {
       id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
@@ -566,7 +568,7 @@ async function main() {
 
   console.log('✅ Created 1 RESOLVED ticket');
 
-  // 5. CLOSED - закрытые тикеты
+  // 5. CLOSED - closed tickets
   const closedTicket = await prisma.ticket.create({
     data: {
       id: 'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
@@ -587,7 +589,7 @@ async function main() {
 
   console.log('🔒 Created 1 CLOSED ticket');
 
-  // 6. AWAITING_FEEDBACK - ожидают обратной связи
+  // 6. AWAITING_FEEDBACK - awaiting feedback tickets
   const awaitingFeedbackTicket = await prisma.ticket.create({
     data: {
       id: 'e5f6a7b8-c9d4-4e0f-1a2b-3c4d5e6f7a8b',
@@ -606,9 +608,8 @@ async function main() {
 
   console.log('💬 Created 1 AWAITING_FEEDBACK ticket');
 
-  // ========== Создание сообщений для IN_PROGRESS тикета 1 ==========
+  // ========== Create Messages for IN_PROGRESS Ticket 1 ==========
 
-  // Сообщение от абитуриента
   await prisma.ticketMessage.create({
     data: {
       ticketId: inProgressTicket1.id,
@@ -621,7 +622,6 @@ async function main() {
     },
   });
 
-  // Ответ от оператора
   await prisma.ticketMessage.create({
     data: {
       ticketId: inProgressTicket1.id,
@@ -635,7 +635,6 @@ async function main() {
     },
   });
 
-  // Дополнительный вопрос
   await prisma.ticketMessage.create({
     data: {
       ticketId: inProgressTicket1.id,
@@ -648,7 +647,6 @@ async function main() {
     },
   });
 
-  // Ответ оператора
   await prisma.ticketMessage.create({
     data: {
       ticketId: inProgressTicket1.id,
@@ -665,7 +663,7 @@ async function main() {
 
   console.log('💬 Created messages for IN_PROGRESS ticket 1');
 
-  // ========== Создание сообщений для IN_PROGRESS тикета 2 ==========
+  // ========== Create Messages for IN_PROGRESS Ticket 2 ==========
 
   await prisma.ticketMessage.create({
     data: {
@@ -718,7 +716,7 @@ async function main() {
 
   console.log('💬 Created messages for IN_PROGRESS ticket 2');
 
-  // ========== Создание сообщений для ESCALATED тикета ==========
+  // ========== Create Messages for ESCALATED Ticket ==========
 
   await prisma.ticketMessage.create({
     data: {
@@ -761,7 +759,7 @@ async function main() {
 
   console.log('💬 Created messages for ESCALATED ticket');
 
-  // ========== Создание эскалации в аудите ==========
+  // ========== Create Escalation Audit Record ==========
 
   await prisma.escalationTicketAudit.create({
     data: {
@@ -777,7 +775,7 @@ async function main() {
 
   console.log('📝 Created escalation audit record');
 
-  // ========== Создание WebSocket соединений (для тестов) ==========
+  // ========== Create WebSocket Connections (for testing) ==========
 
   await prisma.userConnection.create({
     data: {
@@ -797,7 +795,7 @@ async function main() {
 
   console.log('🔌 Created test WebSocket connections');
 
-  // ========== Итоговая статистика ==========
+  // ========== Final Statistics ==========
 
   const ticketsCount = await prisma.ticket.count();
   const messagesCount = await prisma.ticketMessage.count();
