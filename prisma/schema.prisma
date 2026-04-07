@@ -136,12 +136,18 @@ model Ticket {
   satisfactionScore SatisfactionScore?       @map("satisfaction_score")
   createdAt         DateTime?                @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt         DateTime?                @default(now()) @map("updated_at") @db.Timestamp(6)
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamp(6)
 
   escalations EscalationTicketAudit[]
   messages    TicketMessage[]
   agent       Account?                @relation("tickets_agent", fields: [agentId], references: [id])
   applicant   Account                 @relation("tickets_applicant", fields: [applicantId], references: [id])
 
+  @@index([status, priority, lastMessageAt])
+  @@index([status, agentId])
+  @@index([status, priority])
+  @@index([agentId, status])
+  @@index([applicantId])
   @@map("tickets")
 }
 
