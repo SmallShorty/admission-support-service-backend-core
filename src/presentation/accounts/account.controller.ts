@@ -4,6 +4,8 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -12,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiOperation,
+  ApiParam,
   ApiResponse,
 } from '@nestjs/swagger';
 import { GetAccountsQueryDto } from 'src/application/dto/accounts/get-accounts-query.dto';
@@ -23,6 +26,7 @@ import { RegisterAccountUseCase } from 'src/application/use-cases/accounts/regis
 import { PaginatedResponseDto } from 'src/shared/dto/paginated-response.dto';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
 import { Account } from 'generated/prisma/client';
+import { UpdateAccountDto } from 'src/application/dto/accounts/update-account.dto';
 
 @Controller('accounts')
 export class AccountController {
@@ -81,5 +85,31 @@ export class AccountController {
     @Query() query: GetAccountsQueryDto,
   ): Promise<PaginatedResponseDto<Omit<Account, 'passwordHash'>>> {
     return this.accountService.accounts(query);
+  }
+
+  @Patch(':id')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update an existing account' })
+  @ApiParam({
+    name: 'id',
+    description: 'Account ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiBody({ type: UpdateAccountDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Account successfully updated',
+  })
+  @ApiResponse({ status: 404, description: 'Account not found' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountDto,
+  ): Promise<Omit<Account, 'passwordHash'>> {
+    // В AccountService должен быть метод update, принимающий id и данные
+    return this.accountService.updateAccount({
+      where: { id },
+      data: dto,
+    });
   }
 }
