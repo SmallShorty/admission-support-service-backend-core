@@ -35,6 +35,7 @@ model Account {
   ticketsAsAgent      Ticket[]                @relation("tickets_agent")
   ticketsAsApplicant  Ticket[]                @relation("tickets_applicant")
   userConnections     UserConnection[]
+  templates           Template[]              @relation("template_creator")
 
   @@map("accounts")
 }
@@ -117,7 +118,6 @@ model TicketMessage {
 
   @@index([ticketId, createdAt])
   @@index([authorId])
-
   @@map("ticket_messages")
 }
 
@@ -136,7 +136,7 @@ model Ticket {
   satisfactionScore SatisfactionScore?       @map("satisfaction_score")
   createdAt         DateTime?                @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt         DateTime?                @default(now()) @map("updated_at") @db.Timestamp(6)
-  lastMessageAt DateTime? @map("last_message_at") @db.Timestamp(6)
+  lastMessageAt     DateTime?                @map("last_message_at") @db.Timestamp(6)
 
   escalations EscalationTicketAudit[]
   messages    TicketMessage[]
@@ -163,6 +163,46 @@ model UserConnection {
   @@index([accountId])
   @@index([socketId])
   @@map("user_connections")
+}
+
+model Template {
+  id String @id @default(uuid()) @db.Uuid
+
+  alias String @unique @db.VarChar(50)
+
+  title String @db.VarChar(255)
+
+  // Поддержка Rich Text (хранение JSON или HTML структуры)
+  content Json @db.JsonB
+
+  category AdmissionIntentCategory @map("category")
+  isActive Boolean                 @default(true) @map("is_active")
+
+  createdBy String   @map("created_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  creator Account @relation("template_creator", fields: [createdBy], references: [id])
+
+  @@index([alias])
+  @@map("templates")
+}
+
+model DynamicVariable {
+  id String @id @default(uuid()) @db.Uuid
+
+  name String @unique @db.VarChar(50)
+
+  description String? @db.VarChar(255)
+  sourceField String  @map("source_field")
+
+  fallbackText String @map("fallback_text")
+
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("dynamic_variables")
 }
 
 // Enums (остаются без изменений, так как они обычно в UPPER_CASE)
