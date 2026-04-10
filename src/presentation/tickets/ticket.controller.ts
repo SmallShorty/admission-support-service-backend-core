@@ -334,11 +334,14 @@ export class TicketController {
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async takeTicket(@Param('id') ticketId: string, @Req() req) {
     const accountId = req.user.id;
-    const ticket = await this.ticketService.takeTicket(ticketId, accountId);
+    const { ticket, systemMessage } = await this.ticketService.takeTicket(
+      ticketId,
+      accountId,
+    );
 
-    // Emit WebSocket updates
     this.ticketGateway.emitQueueUpdate(ticket, 'updated');
     this.ticketGateway.emitTicketUpdate(ticket, accountId);
+    this.ticketGateway.server.to(ticketId).emit('newTicketMessage', systemMessage);
 
     return ticket;
   }

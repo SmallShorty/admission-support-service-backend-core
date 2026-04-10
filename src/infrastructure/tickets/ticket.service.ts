@@ -750,25 +750,42 @@ export class TicketService {
         );
       }
 
-      const updatedTicket = await tx.ticket.update({
-        where: { id: ticketId },
-        data: {
-          agentId: accountId,
-          status: TicketStatus.IN_PROGRESS,
-          assignedAt: new Date(),
-          updatedAt: new Date(),
-        },
-        include: {
-          applicant: {
-            select: this.applicantSelectFields,
+      const now = new Date();
+
+      const [updatedTicket, systemMessage] = await Promise.all([
+        tx.ticket.update({
+          where: { id: ticketId },
+          data: {
+            agentId: accountId,
+            status: TicketStatus.IN_PROGRESS,
+            assignedAt: now,
+            updatedAt: now,
+            lastMessageAt: now,
           },
-        },
-      });
+          include: {
+            applicant: {
+              select: this.applicantSelectFields,
+            },
+          },
+        }),
+        tx.ticketMessage.create({
+          data: {
+            ticketId,
+            authorId: accountId,
+            authorType: MessageType.SYSTEM,
+            content: 'Ticket assigned to agent',
+            status: 'SENT',
+          },
+        }),
+      ]);
 
       this.logger.log(
         `Ticket ${ticketId} successfully taken by agent ${accountId}`,
       );
-      return this.toTicketListResponse(updatedTicket);
+      return {
+        ticket: this.toTicketListResponse(updatedTicket),
+        systemMessage,
+      };
     });
   }
 
