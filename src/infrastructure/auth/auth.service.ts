@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from 'src/application/dto/auth/login.dto';
 import { AccountService } from '../prisma/accounts.service';
@@ -9,6 +10,7 @@ export class AuthService {
   constructor(
     private accountService: AccountService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -46,7 +48,7 @@ export class AuthService {
   async refreshTokens(refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: this.jwtService['secret'],
+        secret: this.configService.get<string>('JWT_SECRET'),
       });
 
       const account = await this.accountService.account({ id: payload.sub });

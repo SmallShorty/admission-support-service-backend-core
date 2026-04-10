@@ -325,12 +325,16 @@ export class TicketService {
           data: {
             updatedAt: new Date(),
             lastMessageAt: new Date(),
-            // Set firstReplyAt if this is the first agent response
-            ...(data.authorType === 'FROM_AGENT' && {
-              firstReplyAt: new Date(),
-            }),
           },
         });
+
+        // Set firstReplyAt only once — when it has never been set before
+        if (data.authorType === MessageType.FROM_AGENT) {
+          await tx.ticket.updateMany({
+            where: { id: data.ticketId, firstReplyAt: null },
+            data: { firstReplyAt: new Date() },
+          });
+        }
         this.logger.debug(`Ticket ${data.ticketId} timestamps updated`);
 
         return message;
@@ -387,6 +391,23 @@ export class TicketService {
       hasMore,
       nextCursor,
     };
+  }
+
+  async markMessagesRead(
+    ticketId: string,
+    messageIds: number[],
+  ): Promise<void> {
+    await this.prisma.ticketMessage.updateMany({
+      where: {
+        id: { in: messageIds.map(BigInt) },
+        ticketId,
+        status: { not: 'SEEN' },
+      },
+      data: {
+        status: 'SEEN',
+        seenAt: new Date(),
+      },
+    });
   }
 
   async getTicketMessagesCount(ticketId: string): Promise<number> {

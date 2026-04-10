@@ -7,9 +7,12 @@ import {
   OnGatewayDisconnect,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { MessageType, TicketStatus } from 'generated/prisma/client';
 import { Server, Socket } from 'socket.io';
 import { TicketService } from 'src/infrastructure/tickets/ticket.service';
+import { AccountService } from 'src/infrastructure/prisma/accounts.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -21,38 +24,69 @@ export class TicketChatGateway
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly ticketService: TicketService) {}
+  private readonly logger = new Logger(TicketChatGateway.name);
+
+  constructor(
+    private readonly ticketService: TicketService,
+    private readonly jwtService: JwtService,
+    private readonly accountService: AccountService,
+  ) {}
 
   // Handle new WS connection
   async handleConnection(client: Socket) {
-    const userId = client.handshake.query.userId as string;
-    const userRole = client.handshake.query.role as string;
+    const token: string =
+      (client.handshake.auth?.token as string) ||
+      (client.handshake.headers?.authorization as string)?.replace(
+        'Bearer ',
+        '',
+      );
 
-    if (!userId) {
-      console.log('Connection rejected: No userId provided');
+    if (!token) {
+      this.logger.warn(`Connection rejected: no token (socket ${client.id})`);
       client.disconnect();
       return;
     }
 
-    await this.ticketService.addConnection(userId, client.id);
-    console.log(
-      `User ${userId} (${userRole}) connected via socket ${client.id}`,
+    let payload: { sub: string; email: string };
+    try {
+      payload = this.jwtService.verify(token);
+    } catch {
+      this.logger.warn(
+        `Connection rejected: invalid token (socket ${client.id})`,
+      );
+      client.disconnect();
+      return;
+    }
+
+    const account = await this.accountService.account({ id: payload.sub });
+    if (!account) {
+      this.logger.warn(
+        `Connection rejected: account ${payload.sub} not found (socket ${client.id})`,
+      );
+      client.disconnect();
+      return;
+    }
+
+    client.data.userId = account.id;
+    client.data.role = account.role;
+
+    await this.ticketService.addConnection(account.id, client.id);
+    this.logger.log(
+      `User ${account.id} (${account.role}) connected via socket ${client.id}`,
     );
 
-    // Auto-join queue rooms based on role
-    if (userRole === 'ADMIN' || userRole === 'SUPERVISOR') {
+    // Auto-join queue rooms based on verified role
+    if (account.role === 'ADMIN' || account.role === 'SUPERVISOR') {
       client.join('queue:all');
-      console.log(`User ${userId} joined queue:all room`);
     }
 
     client.join('queue:available');
-    console.log(`User ${userId} joined queue:available room`);
   }
 
   // Handle WS disconnection
   async handleDisconnect(client: Socket) {
     await this.ticketService.removeConnection(client.id);
-    console.log(`Socket ${client.id} disconnected`);
+    this.logger.log(`Socket ${client.id} disconnected`);
   }
 
   // Client joins a specific ticket room
@@ -87,13 +121,11 @@ export class TicketChatGateway
 
   // Client joins all queue room (admin/supervisor only)
   @SubscribeMessage('joinAllQueue')
-  handleJoinAllQueue(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { role: string },
-  ) {
-    if (data.role === 'ADMIN' || data.role === 'SUPERVISOR') {
+  handleJoinAllQueue(@ConnectedSocket() client: Socket) {
+    const role = client.data.role as string;
+    if (role === 'ADMIN' || role === 'SUPERVISOR') {
       client.join('queue:all');
-      console.log(`Socket ${client.id} joined all queue room`);
+      this.logger.log(`Socket ${client.id} joined all queue room`);
       return { status: 'joined', queue: 'all' };
     }
     return { status: 'error', message: 'Insufficient permissions' };
@@ -228,12 +260,12 @@ export class TicketChatGateway
     @MessageBody()
     data: { ticketId: string; userId: string; messageIds: number[] },
   ) {
-    // Here you would update message status in database
-    console.log(
-      `User ${data.userId} marked messages as read in ticket ${data.ticketId}`,
+    await this.ticketService.markMessagesRead(data.ticketId, data.messageIds);
+
+    this.logger.log(
+      `User ${data.userId} marked ${data.messageIds.length} messages as read in ticket ${data.ticketId}`,
     );
 
-    // Notify other participants
     client.to(data.ticketId).emit('messagesRead', {
       userId: data.userId,
       messageIds: data.messageIds,
