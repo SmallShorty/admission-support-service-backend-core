@@ -225,9 +225,27 @@ model Integration {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt      @map("updated_at") @db.Timestamp(6)
 
+  notifications Notification[]
+
   @@index([name])
   @@index([eventType])
   @@map("integrations")
+}
+
+model Notification {
+  id            String             @id @default(uuid()) @db.Uuid
+  integrationId String             @map("integration_id") @db.Uuid
+  payload       Json               @db.JsonB
+  status        NotificationStatus @default(PENDING)
+  error         String?            @db.Text
+  sentAt        DateTime?          @map("sent_at") @db.Timestamp(6)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamp(6)
+
+  integration Integration @relation(fields: [integrationId], references: [id])
+
+  @@index([integrationId])
+  @@index([status])
+  @@map("notifications")
 }
 
 // Enums (остаются без изменений, так как они обычно в UPPER_CASE)
@@ -325,4 +343,10 @@ enum TicketStatus {
 enum IntegrationEventType {
   INFORMATIONAL
   FAILURE
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
 }

@@ -6,6 +6,7 @@ import { AuthModule } from './presentation/auth/auth.module';
 import { TicketModule } from './presentation/tickets/ticket.module';
 import { TemplatesModule } from './presentation/templates/templates.module';
 import { IntegrationsModule } from './presentation/integrations/integrations.module';
+import { NotificationsModule } from './presentation/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { IntegrationsModule } from './presentation/integrations/integrations.mod
     TicketModule,
     TemplatesModule,
     IntegrationsModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [PrismaService],
