@@ -43,7 +43,7 @@ export class CreateIntegrationDto {
     description: 'Integration payload template as JSON',
   })
   @IsObject()
-  content: Record<string, any>;
+  content: any;
 
   @ApiPropertyOptional({ example: true, default: true })
   @IsOptional()

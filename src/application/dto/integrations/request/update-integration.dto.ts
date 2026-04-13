@@ -44,7 +44,7 @@ export class UpdateIntegrationDto {
   })
   @IsOptional()
   @IsObject()
-  content?: Record<string, any>;
+  content?: any;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

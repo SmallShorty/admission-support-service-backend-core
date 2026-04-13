@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from 'generated/prisma';
+import { Prisma } from 'generated/prisma/client';
 import { IntegrationEventType } from 'generated/prisma/enums';
 import { CreateIntegrationDto } from 'src/application/dto/integrations/request/create-integration.dto';
 import { UpdateIntegrationDto } from 'src/application/dto/integrations/request/update-integration.dto';

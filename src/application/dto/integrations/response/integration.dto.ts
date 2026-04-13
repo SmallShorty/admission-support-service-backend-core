@@ -24,7 +24,7 @@ export class IntegrationDto {
     example: { text: 'Ticket {{id}} failed', chatId: '-100123' },
     description: 'Integration payload template as JSON',
   })
-  content: Record<string, any>;
+  content: any;
 
   @ApiProperty({ example: true })
   isActive: boolean;

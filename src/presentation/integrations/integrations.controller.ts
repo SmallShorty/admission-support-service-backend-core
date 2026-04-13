@@ -30,7 +30,7 @@ import { PaginatedResponseDto } from 'src/shared/dto/paginated-response.dto';
 @ApiTags('Integrations')
 @Controller('integrations')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('JWT-auth')
 export class IntegrationsController {
   constructor(private readonly integrationService: IntegrationService) {}
 
