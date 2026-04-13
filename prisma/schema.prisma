@@ -205,6 +205,31 @@ model DynamicVariable {
   @@map("dynamic_variables")
 }
 
+model Integration {
+  id        String @id @default(uuid()) @db.Uuid
+  slug      String @unique @db.VarChar(100)
+  name      String @db.VarChar(255)
+  eventType IntegrationEventType @map("event_type")
+
+  theme   String @db.VarChar(100)
+  source  String @db.VarChar(255)
+  content Json   @db.JsonB
+
+  isActive Boolean @default(true) @map("is_active")
+
+  isTypeEditable    Boolean @default(true) @map("is_type_editable")
+  isThemeEditable   Boolean @default(true) @map("is_theme_editable")
+  isSourceEditable  Boolean @default(true) @map("is_source_editable")
+  isContentEditable Boolean @default(true) @map("is_content_editable")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt      @map("updated_at") @db.Timestamp(6)
+
+  @@index([name])
+  @@index([eventType])
+  @@map("integrations")
+}
+
 // Enums (остаются без изменений, так как они обычно в UPPER_CASE)
 
 enum AccountRole {
@@ -295,4 +320,9 @@ enum TicketStatus {
   RESOLVED
   CLOSED
   AWAITING_FEEDBACK
+}
+
+enum IntegrationEventType {
+  INFORMATIONAL
+  FAILURE
 }

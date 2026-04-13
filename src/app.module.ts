@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './presentation/auth/auth.module';
 import { TicketModule } from './presentation/tickets/ticket.module';
 import { TemplatesModule } from './presentation/templates/templates.module';
+import { IntegrationsModule } from './presentation/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TemplatesModule } from './presentation/templates/templates.module';
     AuthModule,
     TicketModule,
     TemplatesModule,
+    IntegrationsModule,
   ],
   controllers: [],
   providers: [PrismaService],
