@@ -8,10 +8,7 @@ import { PrismaService } from './prisma.service';
 export class NotificationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(
-    integrationId: string,
-    payload: any,
-  ): Promise<NotificationDto> {
+  async create(integrationId: string, payload: any): Promise<NotificationDto> {
     return this.prisma.notification.create({
       data: { integrationId, payload },
     });

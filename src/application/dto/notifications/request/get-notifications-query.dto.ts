@@ -9,7 +9,10 @@ export class GetNotificationsQueryDto {
   @IsUUID()
   integrationId?: string;
 
-  @ApiPropertyOptional({ enum: NotificationStatus, description: 'Filter by status' })
+  @ApiPropertyOptional({
+    enum: NotificationStatus,
+    description: 'Filter by status',
+  })
   @IsOptional()
   @IsEnum(NotificationStatus)
   status?: NotificationStatus;

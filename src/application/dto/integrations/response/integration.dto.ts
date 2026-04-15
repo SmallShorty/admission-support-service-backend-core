@@ -11,7 +11,10 @@ export class IntegrationDto {
   @ApiProperty({ example: 'Telegram Failure Alerts' })
   name: string;
 
-  @ApiProperty({ enum: IntegrationEventType, example: IntegrationEventType.FAILURE })
+  @ApiProperty({
+    enum: IntegrationEventType,
+    example: IntegrationEventType.FAILURE,
+  })
   eventType: IntegrationEventType;
 
   @ApiProperty({ example: 'dark' })

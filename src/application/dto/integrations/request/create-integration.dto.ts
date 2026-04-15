@@ -11,7 +11,10 @@ import {
 import { IntegrationEventType } from 'generated/prisma/enums';
 
 export class CreateIntegrationDto {
-  @ApiProperty({ example: 'telegram-failure-alert', description: 'Unique slug' })
+  @ApiProperty({
+    example: 'telegram-failure-alert',
+    description: 'Unique slug',
+  })
   @IsString()
   @IsNotEmpty()
   @Matches(/^[a-z0-9-]+$/, {
@@ -24,7 +27,10 @@ export class CreateIntegrationDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ enum: IntegrationEventType, example: IntegrationEventType.FAILURE })
+  @ApiProperty({
+    enum: IntegrationEventType,
+    example: IntegrationEventType.FAILURE,
+  })
   @IsEnum(IntegrationEventType)
   eventType: IntegrationEventType;
 

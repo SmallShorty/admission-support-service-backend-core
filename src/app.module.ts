@@ -7,6 +7,8 @@ import { TicketModule } from './presentation/tickets/ticket.module';
 import { TemplatesModule } from './presentation/templates/templates.module';
 import { IntegrationsModule } from './presentation/integrations/integrations.module';
 import { NotificationsModule } from './presentation/notifications/notifications.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { AnalyticsModule } from './presentation/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -14,12 +16,14 @@ import { NotificationsModule } from './presentation/notifications/notifications.
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     AccountModule,
     AuthModule,
     TicketModule,
     TemplatesModule,
     IntegrationsModule,
     NotificationsModule,
+    AnalyticsModule,
   ],
   controllers: [],
   providers: [PrismaService],

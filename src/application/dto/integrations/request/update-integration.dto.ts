@@ -23,7 +23,10 @@ export class UpdateIntegrationDto {
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ enum: IntegrationEventType, example: IntegrationEventType.FAILURE })
+  @ApiPropertyOptional({
+    enum: IntegrationEventType,
+    example: IntegrationEventType.FAILURE,
+  })
   @IsOptional()
   @IsEnum(IntegrationEventType)
   eventType?: IntegrationEventType;
@@ -33,7 +36,9 @@ export class UpdateIntegrationDto {
   @IsString()
   theme?: string;
 
-  @ApiPropertyOptional({ example: 'https://api.telegram.org/bot123/sendMessage' })
+  @ApiPropertyOptional({
+    example: 'https://api.telegram.org/bot123/sendMessage',
+  })
   @IsOptional()
   @IsString()
   source?: string;

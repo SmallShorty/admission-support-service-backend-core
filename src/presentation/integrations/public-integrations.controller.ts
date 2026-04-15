@@ -28,7 +28,10 @@ export class PublicIntegrationsController {
   @Public()
   @ApiOperation({ summary: 'Get integration form by slug (public)' })
   @ApiResponse({ status: 200, type: PublicIntegrationDto })
-  @ApiResponse({ status: 404, description: 'Integration not found or inactive' })
+  @ApiResponse({
+    status: 404,
+    description: 'Integration not found or inactive',
+  })
   async getForm(@Param('slug') slug: string): Promise<PublicIntegrationDto> {
     const integration = await this.integrationService.findBySlug(slug);
 
@@ -45,7 +48,10 @@ export class PublicIntegrationsController {
   @ApiOperation({ summary: 'Submit integration form (public)' })
   @ApiResponse({ status: 201, type: NotificationDto })
   @ApiResponse({ status: 400, description: 'Non-editable field submitted' })
-  @ApiResponse({ status: 404, description: 'Integration not found or inactive' })
+  @ApiResponse({
+    status: 404,
+    description: 'Integration not found or inactive',
+  })
   async submit(
     @Param('slug') slug: string,
     @Body() dto: SubmitIntegrationDto,

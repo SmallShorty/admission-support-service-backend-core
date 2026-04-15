@@ -341,7 +341,9 @@ export class TicketController {
 
     this.ticketGateway.emitQueueUpdate(ticket, 'updated');
     this.ticketGateway.emitTicketUpdate(ticket, accountId);
-    this.ticketGateway.server.to(ticketId).emit('newTicketMessage', systemMessage);
+    this.ticketGateway.server
+      .to(ticketId)
+      .emit('newTicketMessage', systemMessage);
 
     return ticket;
   }

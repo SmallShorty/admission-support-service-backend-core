@@ -1,0 +1,106 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class TrendDto {
+  @ApiProperty({
+    example: 24.0,
+    description: 'Percentage change vs previous period',
+  })
+  percentage: number;
+
+  @ApiProperty({ enum: ['up', 'down', 'flat'] })
+  direction: 'up' | 'down' | 'flat';
+}
+
+export class RequestsDto {
+  @ApiProperty({ example: 1900 })
+  total: number;
+
+  @ApiProperty({ type: TrendDto })
+  trend: TrendDto;
+
+  @ApiProperty({
+    example: 342,
+    description: 'Tickets in NEW | IN_PROGRESS | ESCALATED | AWAITING_FEEDBACK',
+  })
+  open: number;
+
+  @ApiProperty({
+    example: 1558,
+    description: 'Tickets in RESOLVED | CLOSED',
+  })
+  resolved: number;
+}
+
+export class MetricTrendDto {
+  @ApiProperty({ example: 450, nullable: true })
+  value: number | null;
+
+  @ApiProperty({
+    example: -2.5,
+    nullable: true,
+    description: 'Delta vs previous snapshot',
+  })
+  trend: number | null;
+}
+
+export class PerformanceDto {
+  @ApiProperty({
+    type: MetricTrendDto,
+    description: 'Average Resolution Time in seconds',
+  })
+  avgRT: MetricTrendDto;
+
+  @ApiProperty({ type: MetricTrendDto, description: 'CSAT score 1-5' })
+  csat: MetricTrendDto;
+
+  @ApiProperty({
+    example: false,
+    description: 'True if avg RT > 12 minutes (720s)',
+  })
+  isSlaBreached: boolean;
+}
+
+export class HourlyActivityDto {
+  @ApiProperty({ example: '10:00' })
+  hour: string;
+
+  @ApiProperty()
+  incoming: number;
+
+  @ApiProperty()
+  resolved: number;
+
+  @ApiProperty()
+  messages: number;
+
+  @ApiProperty({ example: 0.25, description: 'resolved / messages ratio' })
+  efficiency: number;
+}
+
+export class AnalyticsMetaDto {
+  @ApiProperty({ enum: ['GLOBAL', 'OPERATOR'] })
+  scope: 'GLOBAL' | 'OPERATOR';
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  agentId: string | null;
+
+  @ApiProperty({ example: 'week' })
+  period: string;
+
+  @ApiProperty({ example: '2026-04-15T22:30:00Z' })
+  lastUpdated: string;
+}
+
+export class AnalyticsResponseDto {
+  @ApiProperty({ type: AnalyticsMetaDto })
+  meta: AnalyticsMetaDto;
+
+  @ApiProperty({ type: RequestsDto })
+  requests: RequestsDto;
+
+  @ApiProperty({ type: PerformanceDto })
+  performance: PerformanceDto;
+
+  @ApiProperty({ type: [HourlyActivityDto] })
+  hourlyActivity: HourlyActivityDto[];
+}

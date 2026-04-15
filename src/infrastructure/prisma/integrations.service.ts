@@ -94,7 +94,10 @@ export class IntegrationService {
     return integration;
   }
 
-  async update(id: string, data: UpdateIntegrationDto): Promise<IntegrationDto> {
+  async update(
+    id: string,
+    data: UpdateIntegrationDto,
+  ): Promise<IntegrationDto> {
     if (data.slug) {
       const conflict = await this.prisma.integration.findFirst({
         where: { slug: data.slug, NOT: { id } },

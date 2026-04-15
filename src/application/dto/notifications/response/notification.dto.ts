@@ -14,7 +14,10 @@ export class NotificationDto {
   })
   payload: any;
 
-  @ApiProperty({ enum: NotificationStatus, example: NotificationStatus.PENDING })
+  @ApiProperty({
+    enum: NotificationStatus,
+    example: NotificationStatus.PENDING,
+  })
   status: NotificationStatus;
 
   @ApiPropertyOptional({ example: 'Connection timeout' })

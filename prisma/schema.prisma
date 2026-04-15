@@ -248,6 +248,17 @@ model Notification {
   @@map("notifications")
 }
 
+model AnalyticsSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  metricName String   @map("metric_name") @db.VarChar(50)
+  agentId    String?  @map("agent_id") @db.Uuid
+  value      Float
+  timestamp  DateTime @default(now())
+
+  @@index([metricName, agentId, timestamp])
+  @@map("analytics_snapshots")
+}
+
 // Enums (остаются без изменений, так как они обычно в UPPER_CASE)
 
 enum AccountRole {

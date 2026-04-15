@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SubmitIntegrationDto } from 'src/application/dto/integrations/request/submit-integration.dto';
 import { NotificationDto } from 'src/application/dto/notifications/response/notification.dto';
 import { IntegrationService } from 'src/infrastructure/prisma/integrations.service';
@@ -11,7 +15,10 @@ export class SubmitIntegrationUseCase {
     private readonly notificationService: NotificationService,
   ) {}
 
-  async execute(slug: string, dto: SubmitIntegrationDto): Promise<NotificationDto> {
+  async execute(
+    slug: string,
+    dto: SubmitIntegrationDto,
+  ): Promise<NotificationDto> {
     const integration = await this.integrationService.findBySlug(slug);
 
     if (!integration.isActive) {

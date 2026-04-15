@@ -8,7 +8,10 @@ export class PublicIntegrationDto {
   @ApiProperty({ example: 'Telegram Failure Alerts' })
   name: string;
 
-  @ApiProperty({ enum: IntegrationEventType, example: IntegrationEventType.FAILURE })
+  @ApiProperty({
+    enum: IntegrationEventType,
+    example: IntegrationEventType.FAILURE,
+  })
   eventType: IntegrationEventType;
 
   @ApiProperty({ example: 'dark' })
@@ -22,7 +25,10 @@ export class PublicIntegrationDto {
   })
   content: any;
 
-  @ApiProperty({ example: false, description: 'Whether event type can be changed' })
+  @ApiProperty({
+    example: false,
+    description: 'Whether event type can be changed',
+  })
   isTypeEditable: boolean;
 
   @ApiProperty({ example: true, description: 'Whether theme can be changed' })

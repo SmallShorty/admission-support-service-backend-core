@@ -18,7 +18,9 @@ export class SubmitIntegrationDto {
   @IsString()
   source?: string;
 
-  @ApiPropertyOptional({ example: { text: 'Custom message', chatId: '-100456' } })
+  @ApiPropertyOptional({
+    example: { text: 'Custom message', chatId: '-100456' },
+  })
   @IsOptional()
   @IsObject()
   content?: any;
