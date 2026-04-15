@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AdmissionIntentCategory } from 'generated/prisma/client';
 
 export class TrendDto {
   @ApiProperty({
@@ -103,12 +104,29 @@ export class HourlyTicketVolumeDto {
   completed: number;
 }
 
+export class CategoryStatsDto {
+  @ApiProperty({ enum: AdmissionIntentCategory })
+  category: AdmissionIntentCategory;
+
+  @ApiProperty({ example: 245 })
+  count: number;
+
+  @ApiProperty({
+    example: 12.9,
+    description: 'Percentage of total tickets in period',
+  })
+  percentage: number;
+}
+
 export class ChartsDto {
   @ApiProperty({ type: [HourlyActivityDto] })
   hourlyActivity: HourlyActivityDto[];
 
   @ApiProperty({ type: [HourlyTicketVolumeDto] })
   hourlyTicketVolume: HourlyTicketVolumeDto[];
+
+  @ApiProperty({ type: [CategoryStatsDto] })
+  categoryStats: CategoryStatsDto[];
 }
 
 export class AnalyticsMetaDto {

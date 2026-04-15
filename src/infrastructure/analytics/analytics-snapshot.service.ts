@@ -6,10 +6,12 @@ import {
   SatisfactionScore,
   MessageType,
   TicketStatus,
+  AdmissionIntentCategory,
 } from 'generated/prisma/client';
 import {
   AnalyticsResponseDto,
   HourlyTicketVolumeDto,
+  CategoryStatsDto,
 } from '../../application/dto/analytics/response/analytics-response.dto';
 
 interface HourlyActivityItem {
@@ -460,5 +462,39 @@ export class AnalyticsSnapshotService {
     }
 
     return buckets;
+  }
+
+  async computeCategoryStats(
+    start: Date,
+    end: Date,
+    agentId?: string,
+  ): Promise<CategoryStatsDto[]> {
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        createdAt: { gte: start, lte: end },
+        intent: { not: null },
+        ...(agentId && { agentId }),
+      },
+      select: { intent: true },
+    });
+
+    // Group by intent
+    const counts = new Map<AdmissionIntentCategory, number>();
+    for (const t of tickets) {
+      if (t.intent) {
+        counts.set(t.intent, (counts.get(t.intent) ?? 0) + 1);
+      }
+    }
+
+    const total = tickets.length;
+
+    // Map to DTO, sort by count desc
+    return Array.from(counts.entries())
+      .map(([category, count]) => ({
+        category,
+        count,
+        percentage: total > 0 ? Math.round((count / total) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 }

@@ -11,6 +11,7 @@ import {
   PerformanceDto,
   MetricTrendDto,
   ChartsDto,
+  CategoryStatsDto,
 } from '../../dto/analytics/response/analytics-response.dto';
 import { TicketStatus } from 'generated/prisma/client';
 
@@ -137,19 +138,26 @@ export class GetAnalyticsUseCase {
     };
 
     // Chart data
-    const [hourlyActivity, hourlyTicketVolume] = await Promise.all([
-      this.analyticsSnapshotService.computeHourlyActivity(start, end, agentId),
-      this.analyticsSnapshotService.computeHourlyTicketVolume(
-        start,
-        end,
-        period,
-        agentId,
-      ),
-    ]);
+    const [hourlyActivity, hourlyTicketVolume, categoryStats] =
+      await Promise.all([
+        this.analyticsSnapshotService.computeHourlyActivity(
+          start,
+          end,
+          agentId,
+        ),
+        this.analyticsSnapshotService.computeHourlyTicketVolume(
+          start,
+          end,
+          period,
+          agentId,
+        ),
+        this.analyticsSnapshotService.computeCategoryStats(start, end, agentId),
+      ]);
 
     const charts: ChartsDto = {
       hourlyActivity,
       hourlyTicketVolume,
+      categoryStats,
     };
 
     // Meta
