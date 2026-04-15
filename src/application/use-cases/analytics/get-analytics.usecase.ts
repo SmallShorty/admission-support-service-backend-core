@@ -10,6 +10,7 @@ import {
   TrendDto,
   PerformanceDto,
   MetricTrendDto,
+  ChartsDto,
 } from '../../dto/analytics/response/analytics-response.dto';
 import { TicketStatus } from 'generated/prisma/client';
 
@@ -135,13 +136,21 @@ export class GetAnalyticsUseCase {
       isSlaBreached,
     };
 
-    // Hourly activity
-    const hourlyActivity =
-      await this.analyticsSnapshotService.computeHourlyActivity(
+    // Chart data
+    const [hourlyActivity, hourlyTicketVolume] = await Promise.all([
+      this.analyticsSnapshotService.computeHourlyActivity(start, end, agentId),
+      this.analyticsSnapshotService.computeHourlyTicketVolume(
         start,
         end,
+        period,
         agentId,
-      );
+      ),
+    ]);
+
+    const charts: ChartsDto = {
+      hourlyActivity,
+      hourlyTicketVolume,
+    };
 
     // Meta
     const lastUpdatedSnap = await this.analyticsService.findLatestSnapshot(
@@ -163,7 +172,7 @@ export class GetAnalyticsUseCase {
       meta,
       requests,
       performance,
-      hourlyActivity,
+      charts,
     };
 
     // Cache and return

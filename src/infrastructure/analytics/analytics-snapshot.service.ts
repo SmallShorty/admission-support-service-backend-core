@@ -7,7 +7,10 @@ import {
   MessageType,
   TicketStatus,
 } from 'generated/prisma/client';
-import { AnalyticsResponseDto } from '../../application/dto/analytics/response/analytics-response.dto';
+import {
+  AnalyticsResponseDto,
+  HourlyTicketVolumeDto,
+} from '../../application/dto/analytics/response/analytics-response.dto';
 
 interface HourlyActivityItem {
   hour: string;
@@ -15,6 +18,12 @@ interface HourlyActivityItem {
   resolved: number;
   messages: number;
   efficiency: number;
+}
+
+interface TimeBucket {
+  label: string;
+  from: Date;
+  to: Date;
 }
 
 @Injectable()
@@ -314,5 +323,142 @@ export class AnalyticsSnapshotService {
       });
 
     return result;
+  }
+
+  async computeHourlyTicketVolume(
+    start: Date,
+    end: Date,
+    period: 'day' | 'week' | 'month',
+    agentId?: string,
+  ): Promise<HourlyTicketVolumeDto[]> {
+    // Fetch tickets that were "in work" (assigned) during this period
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        ...(agentId && { agentId }),
+        // For global scope: only count tickets assigned to someone
+        ...(!agentId && { agentId: { not: null } }),
+        // Ticket must be assigned by end of period
+        assignedAt: { not: null, lte: end },
+        // Ticket must either be unresolved or resolved within period
+        OR: [{ resolvedAt: null }, { resolvedAt: { gte: start } }],
+      },
+      select: {
+        createdAt: true,
+        assignedAt: true,
+        resolvedAt: true,
+      },
+    });
+
+    // Build buckets based on period
+    const buckets = this.buildBuckets(start, period);
+
+    // For each bucket, count tickets
+    const result = buckets.map((bucket) => {
+      const incoming = tickets.filter(
+        (t) =>
+          t.createdAt && t.createdAt >= bucket.from && t.createdAt < bucket.to,
+      ).length;
+
+      const completed = tickets.filter(
+        (t) =>
+          t.resolvedAt &&
+          t.resolvedAt >= bucket.from &&
+          t.resolvedAt < bucket.to,
+      ).length;
+
+      const count = tickets.filter((t) => {
+        // Ticket is "in work" if it was assigned by bucket end
+        // and either unresolved or resolved after bucket start
+        const assignedByEnd = t.assignedAt && t.assignedAt < bucket.to;
+        const resolvedAfterStart = !t.resolvedAt || t.resolvedAt >= bucket.from;
+        return assignedByEnd && resolvedAfterStart;
+      }).length;
+
+      return {
+        label: bucket.label,
+        count,
+        incoming,
+        completed,
+      };
+    });
+
+    return result;
+  }
+
+  private buildBuckets(
+    start: Date,
+    period: 'day' | 'week' | 'month',
+  ): TimeBucket[] {
+    const buckets: TimeBucket[] = [];
+
+    if (period === 'day') {
+      // Hourly buckets from 10:00 to 18:00
+      const dayStart = new Date(start);
+      dayStart.setHours(10, 0, 0, 0);
+
+      for (let hour = 10; hour <= 18; hour++) {
+        const from = new Date(dayStart);
+        from.setHours(hour, 0, 0, 0);
+
+        const to = new Date(from);
+        to.setHours(hour + 1, 0, 0, 0);
+
+        const label = `${String(hour).padStart(2, '0')}:00`;
+        buckets.push({ label, from, to });
+      }
+    } else if (period === 'week') {
+      // Daily buckets for 7 days from start
+      for (let i = 0; i < 7; i++) {
+        const from = new Date(start);
+        from.setDate(start.getDate() + i);
+        from.setHours(0, 0, 0, 0);
+
+        const to = new Date(from);
+        to.setDate(from.getDate() + 1);
+        to.setHours(0, 0, 0, 0);
+
+        const dayNames = [
+          'Sunday',
+          'Monday',
+          'Tuesday',
+          'Wednesday',
+          'Thursday',
+          'Friday',
+          'Saturday',
+        ];
+        const monthShort = from.toLocaleString('en', { month: 'short' });
+        const day = from.getDate();
+        const dayName = dayNames[from.getDay()];
+
+        const label = `${dayName} ${monthShort} ${day}`;
+        buckets.push({ label, from, to });
+      }
+    } else if (period === 'month') {
+      // Weekly buckets (4 weeks of 7 days each)
+      for (let week = 0; week < 4; week++) {
+        const from = new Date(start);
+        from.setDate(start.getDate() + week * 7);
+        from.setHours(0, 0, 0, 0);
+
+        const to = new Date(from);
+        to.setDate(from.getDate() + 7);
+        to.setHours(0, 0, 0, 0);
+
+        const monthShort = from.toLocaleString('en', { month: 'short' });
+        const startDay = from.getDate();
+        const endDay = to.getDate() - 1;
+        const endMonth = to.toLocaleString('en', { month: 'short' });
+
+        // Handle month boundaries
+        const label =
+          from.getMonth() === to.getMonth()
+            ? `Week ${week + 1} (${monthShort} ${startDay}-${endDay})`
+            : `Week ${week + 1} (${monthShort} ${startDay}-${endMonth} ${endDay})`;
+
+        buckets.push({ label, from, to });
+      }
+    }
+
+    return buckets;
   }
 }

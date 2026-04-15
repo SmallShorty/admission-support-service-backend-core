@@ -77,6 +77,40 @@ export class HourlyActivityDto {
   efficiency: number;
 }
 
+export class HourlyTicketVolumeDto {
+  @ApiProperty({
+    example: '10:00',
+    description: 'Label: hour (day), date (week), or week range (month)',
+  })
+  label: string;
+
+  @ApiProperty({
+    example: 52,
+    description: 'Tickets in work during this bucket',
+  })
+  count: number;
+
+  @ApiProperty({
+    example: 15,
+    description: 'Tickets newly assigned/created in this bucket',
+  })
+  incoming: number;
+
+  @ApiProperty({
+    example: 8,
+    description: 'Tickets resolved or closed in this bucket',
+  })
+  completed: number;
+}
+
+export class ChartsDto {
+  @ApiProperty({ type: [HourlyActivityDto] })
+  hourlyActivity: HourlyActivityDto[];
+
+  @ApiProperty({ type: [HourlyTicketVolumeDto] })
+  hourlyTicketVolume: HourlyTicketVolumeDto[];
+}
+
 export class AnalyticsMetaDto {
   @ApiProperty({ enum: ['GLOBAL', 'OPERATOR'] })
   scope: 'GLOBAL' | 'OPERATOR';
@@ -101,6 +135,6 @@ export class AnalyticsResponseDto {
   @ApiProperty({ type: PerformanceDto })
   performance: PerformanceDto;
 
-  @ApiProperty({ type: [HourlyActivityDto] })
-  hourlyActivity: HourlyActivityDto[];
+  @ApiProperty({ type: ChartsDto })
+  charts: ChartsDto;
 }
