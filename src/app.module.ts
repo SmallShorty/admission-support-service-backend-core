@@ -9,6 +9,7 @@ import { IntegrationsModule } from './presentation/integrations/integrations.mod
 import { NotificationsModule } from './presentation/notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AnalyticsModule } from './presentation/analytics/analytics.module';
+import { VariablesModule } from './presentation/variables/variables.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AnalyticsModule } from './presentation/analytics/analytics.module';
     IntegrationsModule,
     NotificationsModule,
     AnalyticsModule,
+    VariablesModule,
   ],
   controllers: [],
   providers: [PrismaService],

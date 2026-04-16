@@ -15,8 +15,8 @@ export class GetTicketVariablesUseCase {
   ) {}
 
   /**
-   * Fetches all variables with their resolved values for a ticket's applicant.
-   * Used by the autocomplete endpoint. Never throws — fallbackText is used for null values.
+   * Fetches only variables that have actual resolved values for the ticket's applicant.
+   * Variables with no data (null resolved value) are excluded from the result.
    */
   async execute(ticketId: string): Promise<VariableResolvedDto[]> {
     const [detail, variables] = await Promise.all([
@@ -26,12 +26,17 @@ export class GetTicketVariablesUseCase {
 
     const context = buildApplicantContext(detail);
 
-    return variables.map((variable) => ({
-      name: variable.name,
-      description: variable.description ?? '',
-      resolvedValue:
-        formatVariableValue(context[variable.sourceField]) ??
-        variable.fallbackText,
-    }));
+    return variables
+      .filter(
+        (variable) =>
+          formatVariableValue(context[variable.sourceField]) !== null,
+      )
+      .map((variable) => ({
+        name: variable.name,
+        description: variable.description ?? '',
+        resolvedValue: formatVariableValue(
+          context[variable.sourceField],
+        ) as string,
+      }));
   }
 }
