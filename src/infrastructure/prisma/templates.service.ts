@@ -17,7 +17,7 @@ export class TemplateService {
    * Creates a new template.
    * Checks for alias uniqueness to prevent collisions in quick-call commands.
    */
-  async create(data: CreateTemplateDto): Promise<TemplateDto> {
+  async create(data: CreateTemplateDto & { createdBy: string }): Promise<TemplateDto> {
     const existing = await this.prisma.template.findUnique({
       where: { alias: data.alias },
     });

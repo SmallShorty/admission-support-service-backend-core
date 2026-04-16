@@ -17,6 +17,4 @@ export class CreateTemplateDto {
   @ApiProperty({ enum: AdmissionIntentCategory, example: 'DORMITORY_HOUSING' })
   category: AdmissionIntentCategory;
 
-  @ApiProperty({ example: 'uuid-of-admin' })
-  createdBy: string;
 }

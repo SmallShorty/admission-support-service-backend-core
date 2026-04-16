@@ -54,10 +54,55 @@ export class ResolveVariablesUseCase {
   }
 
   /**
+   * Resolves all $variable tokens inside a Tiptap JSON tree.
+   * Traverses text nodes recursively and substitutes tokens in place.
+   * Never throws — missing variables are collected and returned alongside the resolved tree.
+   */
+  async resolveRichTextContent(
+    ticketId: string,
+    content: any,
+  ): Promise<{ resolved: any; missingVariables: string[] }> {
+    if (!content) {
+      return { resolved: content, missingVariables: [] };
+    }
+
+    const [detail, variables] = await Promise.all([
+      this.ticketService.getTicketDetails(ticketId),
+      this.dynamicVariableService.findAll(),
+    ]);
+
+    const context = buildApplicantContext(detail);
+    const allMissing: string[] = [];
+
+    const traverse = (node: any): any => {
+      if (!node) return node;
+
+      if (node.type === 'text' && typeof node.text === 'string') {
+        const { resolved, missingVariables } = this.substitute(
+          node.text,
+          variables,
+          context,
+        );
+        allMissing.push(...missingVariables);
+        return { ...node, text: resolved };
+      }
+
+      if (Array.isArray(node.content)) {
+        return { ...node, content: node.content.map(traverse) };
+      }
+
+      return node;
+    };
+
+    const resolved = traverse(content);
+    return { resolved, missingVariables: [...new Set(allMissing)] };
+  }
+
+  /**
    * Performs the actual variable substitution.
    * Returns both the resolved content and a list of missing variables.
    */
-  private substitute(
+  protected substitute(
     content: string,
     variables: DynamicVariable[],
     context: Record<string, unknown>,
