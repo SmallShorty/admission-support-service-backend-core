@@ -49,6 +49,30 @@ export class TicketDetailResponseDto extends TicketListResponseDto {
   @ApiProperty({ type: [ApplicantProgramDto] })
   applicantPrograms: ApplicantProgramDto[];
 
+  @ApiProperty({ example: '12345678901', required: false })
+  applicantSnils?: string;
+
+  @ApiProperty({ example: false })
+  applicantHasBvi?: boolean;
+
+  @ApiProperty({ example: false })
+  applicantHasSpecialQuota?: boolean;
+
+  @ApiProperty({ example: false })
+  applicantHasSeparateQuota?: boolean;
+
+  @ApiProperty({ example: false })
+  applicantHasTargetQuota?: boolean;
+
+  @ApiProperty({ example: false })
+  applicantHasPriorityRight?: boolean;
+
+  @ApiProperty({ example: true })
+  applicantOriginalDocumentReceived?: boolean;
+
+  @ApiProperty({ example: '2024-01-15T10:00:00Z', required: false })
+  applicantOriginalDocumentReceivedAt?: string;
+
   @ApiProperty({ example: '2024-01-15T10:30:00Z', required: false })
   assignedAt?: string;
 

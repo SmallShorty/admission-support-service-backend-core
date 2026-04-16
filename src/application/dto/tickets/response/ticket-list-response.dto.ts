@@ -16,6 +16,9 @@ export class ApplicantInfoDto {
 
   @ApiProperty({ example: 'Smith', required: false })
   middleName?: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  email: string;
 }
 
 export class OperatorInfoDto {

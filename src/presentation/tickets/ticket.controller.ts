@@ -33,7 +33,9 @@ import {
   TicketListResponseDto,
   TicketDetailResponseDto,
   TicketCountsResponseDto,
+  VariableResolvedDto,
 } from 'src/application/dto/tickets/index';
+import { GetTicketVariablesUseCase } from 'src/application/use-cases/tickets/get-ticket-variables.usecase';
 
 @ApiTags('Tickets')
 @ApiBearerAuth('JWT-auth')
@@ -43,6 +45,7 @@ export class TicketController {
   constructor(
     private readonly ticketService: TicketService,
     private readonly ticketGateway: TicketChatGateway,
+    private readonly getTicketVariablesUseCase: GetTicketVariablesUseCase,
   ) {}
 
   @Get('my')
@@ -470,6 +473,28 @@ export class TicketController {
     this.ticketGateway.emitQueueUpdate(ticket, 'updated');
 
     return ticket;
+  }
+
+  @Get(':id/variables')
+  @ApiOperation({
+    summary: 'Get resolved variables for autocomplete',
+    description:
+      'Returns all variables with their current resolved values for the ticket applicant. Used by frontend for autocomplete when typing $',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Ticket ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of variables with resolved values',
+    type: [VariableResolvedDto],
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  async getTicketVariables(@Param('id') id: string): Promise<VariableResolvedDto[]> {
+    return this.getTicketVariablesUseCase.execute(id);
   }
 
   @Get(':id')

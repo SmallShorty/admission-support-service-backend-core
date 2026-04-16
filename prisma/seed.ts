@@ -30,6 +30,11 @@ async function main() {
   await prisma.applicantProgram.deleteMany();
   await prisma.examScore.deleteMany();
   await prisma.applicant.deleteMany();
+  await prisma.dynamicVariable.deleteMany();
+  await prisma.template.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.integration.deleteMany();
+  await prisma.analyticsSnapshot.deleteMany();
   await prisma.account.deleteMany();
 
   console.log('✅ Cleaned existing data');
@@ -795,11 +800,210 @@ async function main() {
 
   console.log('🔌 Created test WebSocket connections');
 
+  // ========== Create Dynamic Variables ==========
+
+  const dynamicVariablesData = [
+    // Identity
+    {
+      name: 'фио',
+      description: 'Полное имя абитуриента (Фамилия Имя Отчество)',
+      sourceField: 'account.fullName',
+      fallbackText: 'Уважаемый абитуриент',
+      isSystem: true,
+    },
+    {
+      name: 'имя',
+      description: 'Имя абитуриента',
+      sourceField: 'account.firstName',
+      fallbackText: 'Абитуриент',
+      isSystem: true,
+    },
+    {
+      name: 'фамилия',
+      description: 'Фамилия абитуриента',
+      sourceField: 'account.lastName',
+      fallbackText: '—',
+      isSystem: true,
+    },
+    {
+      name: 'отчество',
+      description: 'Отчество абитуриента',
+      sourceField: 'account.middleName',
+      fallbackText: '—',
+      isSystem: true,
+    },
+    {
+      name: 'email',
+      description: 'Email абитуриента',
+      sourceField: 'account.email',
+      fallbackText: '—',
+      isSystem: true,
+    },
+    {
+      name: 'снилс',
+      description: 'СНИЛС абитуриента',
+      sourceField: 'applicant.snils',
+      fallbackText: 'не указан',
+      isSystem: true,
+    },
+    // Quota flags
+    {
+      name: 'льгота_бви',
+      description: 'Право на поступление без вступительных испытаний',
+      sourceField: 'applicant.hasBvi',
+      fallbackText: 'нет',
+      isSystem: true,
+    },
+    {
+      name: 'льгота_особая',
+      description: 'Особая квота',
+      sourceField: 'applicant.hasSpecialQuota',
+      fallbackText: 'нет',
+      isSystem: true,
+    },
+    {
+      name: 'льгота_отдельная',
+      description: 'Отдельная квота',
+      sourceField: 'applicant.hasSeparateQuota',
+      fallbackText: 'нет',
+      isSystem: true,
+    },
+    {
+      name: 'льгота_целевая',
+      description: 'Целевая квота',
+      sourceField: 'applicant.hasTargetQuota',
+      fallbackText: 'нет',
+      isSystem: true,
+    },
+    {
+      name: 'преимущественное_право',
+      description: 'Преимущественное право зачисления',
+      sourceField: 'applicant.hasPriorityRight',
+      fallbackText: 'нет',
+      isSystem: true,
+    },
+    // Documents
+    {
+      name: 'оригинал_сдан',
+      description: 'Оригинал аттестата сдан',
+      sourceField: 'applicant.originalDocumentReceived',
+      fallbackText: 'нет',
+      isSystem: true,
+    },
+    {
+      name: 'оригинал_дата',
+      description: 'Дата сдачи оригинала аттестата',
+      sourceField: 'applicant.originalDocumentReceivedAt',
+      fallbackText: 'не указана',
+      isSystem: true,
+    },
+    // Programs
+    {
+      name: 'направление_1',
+      description: 'Код программы первого приоритета',
+      sourceField: 'applicant.programs.first.programCode',
+      fallbackText: 'не выбрано',
+      isSystem: true,
+    },
+    {
+      name: 'форма_1',
+      description: 'Форма обучения первого приоритета',
+      sourceField: 'applicant.programs.first.studyForm',
+      fallbackText: 'не указана',
+      isSystem: true,
+    },
+    {
+      name: 'основание_1',
+      description: 'Основание поступления первого приоритета',
+      sourceField: 'applicant.programs.first.admissionType',
+      fallbackText: 'не указано',
+      isSystem: true,
+    },
+    {
+      name: 'направление_2',
+      description: 'Код программы второго приоритета',
+      sourceField: 'applicant.programs.second.programCode',
+      fallbackText: 'не выбрано',
+      isSystem: true,
+    },
+    {
+      name: 'форма_2',
+      description: 'Форма обучения второго приоритета',
+      sourceField: 'applicant.programs.second.studyForm',
+      fallbackText: 'не указана',
+      isSystem: true,
+    },
+    {
+      name: 'количество_программ',
+      description: 'Количество выбранных программ',
+      sourceField: 'applicant.programs.count',
+      fallbackText: '0',
+      isSystem: true,
+    },
+    // Exam scores
+    {
+      name: 'балл_русский',
+      description: 'Балл ЕГЭ по русскому языку',
+      sourceField: 'applicant.exams.Русский язык.score',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+    {
+      name: 'балл_математика',
+      description: 'Балл ЕГЭ по математике',
+      sourceField: 'applicant.exams.Математика.score',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+    {
+      name: 'балл_физика',
+      description: 'Балл ЕГЭ/ВИ по физике',
+      sourceField: 'applicant.exams.Физика.score',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+    {
+      name: 'балл_информатика',
+      description: 'Балл ЕГЭ/ВИ по информатике',
+      sourceField: 'applicant.exams.Информатика и ИКТ.score',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+    {
+      name: 'балл_общество',
+      description: 'Балл ЕГЭ по обществознанию',
+      sourceField: 'applicant.exams.Обществознание.score',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+    {
+      name: 'балл_химия',
+      description: 'Балл ЕГЭ/ВИ по химии',
+      sourceField: 'applicant.exams.Химия.score',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+    {
+      name: 'сумма_баллов',
+      description: 'Сумма всех баллов ЕГЭ',
+      sourceField: 'applicant.exams.total',
+      fallbackText: 'нет данных',
+      isSystem: true,
+    },
+  ];
+
+  await prisma.dynamicVariable.createMany({
+    data: dynamicVariablesData,
+  });
+
+  console.log('📝 Created 25 dynamic variables');
+
   // ========== Final Statistics ==========
 
   const ticketsCount = await prisma.ticket.count();
   const messagesCount = await prisma.ticketMessage.count();
   const accountsCount = await prisma.account.count();
+  const variablesCount = await prisma.dynamicVariable.count();
 
   console.log('\n=================================');
   console.log('✅ Seeding completed successfully!');
@@ -810,6 +1014,7 @@ async function main() {
   console.log(`  💬 Messages: ${messagesCount}`);
   console.log(`  📚 Exam scores: ${examScoresData.length}`);
   console.log(`  🎓 Programs: ${applicantProgramsData.length}`);
+  console.log(`  📝 Dynamic variables: ${variablesCount}`);
 
   console.log('\n📋 Test accounts:');
   console.log('  👑 Admin:      admin@admin.com / admin');

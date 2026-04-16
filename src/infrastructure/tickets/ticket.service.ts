@@ -102,6 +102,14 @@ export interface TicketDetailResponse extends TicketListResponse {
     admissionType: string;
     priority: number;
   }>;
+  applicantSnils?: string;
+  applicantHasBvi?: boolean;
+  applicantHasSpecialQuota?: boolean;
+  applicantHasSeparateQuota?: boolean;
+  applicantHasTargetQuota?: boolean;
+  applicantHasPriorityRight?: boolean;
+  applicantOriginalDocumentReceived?: boolean;
+  applicantOriginalDocumentReceivedAt?: string;
 }
 
 @Injectable()
@@ -264,7 +272,7 @@ export class TicketService {
         firstName: ticket.applicant.firstName,
         lastName: ticket.applicant.lastName,
         middleName: ticket.applicant.middleName || undefined,
-        email: ticket.applicant.email,
+        email: ticket.applicant.email || '',
       },
       operator: {
         id: ticket.agentId || null,
@@ -718,6 +726,16 @@ export class TicketService {
           priority: program.priority,
         }),
       ),
+      applicantSnils: applicantData?.snils || undefined,
+      applicantHasBvi: applicantData?.hasBvi,
+      applicantHasSpecialQuota: applicantData?.hasSpecialQuota,
+      applicantHasSeparateQuota: applicantData?.hasSeparateQuota,
+      applicantHasTargetQuota: applicantData?.hasTargetQuota,
+      applicantHasPriorityRight: applicantData?.hasPriorityRight,
+      applicantOriginalDocumentReceived:
+        applicantData?.originalDocumentReceived,
+      applicantOriginalDocumentReceivedAt:
+        applicantData?.originalDocumentReceivedAt?.toISOString() || undefined,
     };
   }
 

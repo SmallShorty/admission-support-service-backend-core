@@ -13,6 +13,7 @@ import { MessageType, TicketStatus } from 'generated/prisma/client';
 import { Server, Socket } from 'socket.io';
 import { TicketService } from 'src/infrastructure/tickets/ticket.service';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { ResolveVariablesUseCase } from 'src/application/use-cases/tickets/resolve-variables.usecase';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -30,6 +31,7 @@ export class TicketChatGateway
     private readonly ticketService: TicketService,
     private readonly jwtService: JwtService,
     private readonly accountService: AccountService,
+    private readonly resolveVariablesUseCase: ResolveVariablesUseCase,
   ) {}
 
   // Handle new WS connection
@@ -145,8 +147,38 @@ export class TicketChatGateway
   ) {
     console.log('New message received:', payload);
 
+    let resolvedContent = payload.content;
+
+    // Resolve variables for FROM_AGENT messages only
+    if (payload.authorType === MessageType.FROM_AGENT) {
+      try {
+        resolvedContent = await this.resolveVariablesUseCase.resolveContent(
+          payload.ticketId,
+          payload.content,
+          payload.authorType,
+        );
+      } catch (err) {
+        // Emit error back to sender only — do NOT save or broadcast
+        console.error(
+          `Variable resolution failed for ticket ${payload.ticketId}:`,
+          err,
+        );
+        client.emit('variableResolutionError', {
+          code: err.response?.code || 'RESOLUTION_ERROR',
+          missingVariables: err.response?.missingVariables || [],
+          message:
+            err.response?.message ||
+            'Failed to resolve variables in message',
+        });
+        return;
+      }
+    }
+
     // 1. Persist to database via service
-    const message = await this.ticketService.saveMessage(payload);
+    const message = await this.ticketService.saveMessage({
+      ...payload,
+      content: resolvedContent,
+    });
 
     // 2. Broadcast to everyone in the ticket room (including sender)
     this.server.to(payload.ticketId).emit('newTicketMessage', message);
