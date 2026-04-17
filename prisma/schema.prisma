@@ -259,6 +259,42 @@ model AnalyticsSnapshot {
   @@map("analytics_snapshots")
 }
 
+model AuditLog {
+  id         String        @id @default(uuid()) @db.Uuid
+  action     AuditAction
+  category   AuditCategory
+  severity   LogSeverity
+  actor      Json?         @db.JsonB
+  targetId   String?       @map("target_id")
+  targetType String?       @map("target_type")
+  metadata   Json?         @db.JsonB
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@index([action])
+  @@index([category])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model IntegrationLog {
+  id            String            @id @default(uuid()) @db.Uuid
+  integrationId String?           @map("integration_id") @db.Uuid
+  slug          String?
+  action        IntegrationAction
+  severity      LogSeverity
+  actor         Json?             @db.JsonB
+  metadata      Json?             @db.JsonB
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@index([action])
+  @@index([severity])
+  @@index([integrationId])
+  @@index([slug])
+  @@index([createdAt])
+  @@map("integration_logs")
+}
+
 // Enums (остаются без изменений, так как они обычно в UPPER_CASE)
 
 enum AccountRole {
@@ -360,4 +396,48 @@ enum NotificationStatus {
   PENDING
   SENT
   FAILED
+}
+
+enum LogSeverity {
+  INFO
+  WARN
+  ERROR
+}
+
+enum AuditCategory {
+  AUTH
+  ACCOUNT
+  TICKET
+  TEMPLATE
+  SECURITY
+  MESSAGING
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  TOKEN_REFRESH_FAILED
+  LOGOUT
+  ACCOUNT_REGISTERED
+  ACCOUNT_UPDATED
+  TICKET_TAKEN
+  TICKET_ESCALATED
+  TICKET_STATUS_CHANGED
+  TEMPLATE_CREATED
+  TEMPLATE_UPDATED
+  TEMPLATE_ACTIVATED
+  TEMPLATE_DEACTIVATED
+  TICKET_ACCESS_FORBIDDEN
+  TICKET_ESCALATION_FORBIDDEN
+  MESSAGE_VARIABLE_RESOLUTION_FAILED
+}
+
+enum IntegrationAction {
+  INTEGRATION_CREATED
+  INTEGRATION_UPDATED
+  INTEGRATION_ACTIVATED
+  INTEGRATION_DEACTIVATED
+  INTEGRATION_SUBMITTED
+  INTEGRATION_SUBMISSION_NOT_FOUND
+  INTEGRATION_SUBMISSION_READONLY_FIELD_VIOLATION
 }
