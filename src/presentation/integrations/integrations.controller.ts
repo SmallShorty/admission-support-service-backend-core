@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,12 +17,14 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { AccountRole } from 'generated/prisma/enums';
+import { AccountRole, IntegrationAction, LogSeverity } from 'generated/prisma/enums';
 import { GetIntegrationsQueryDto } from 'src/application/dto/integrations/request/get-integrations-query.dto';
 import { CreateIntegrationDto } from 'src/application/dto/integrations/request/create-integration.dto';
 import { UpdateIntegrationDto } from 'src/application/dto/integrations/request/update-integration.dto';
 import { IntegrationDto } from 'src/application/dto/integrations/response/integration.dto';
 import { IntegrationService } from 'src/infrastructure/prisma/integrations.service';
+import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { IntegrationLogService } from 'src/infrastructure/prisma/integration-log.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from 'src/shared/decorators/roles.decorator';
@@ -32,7 +35,11 @@ import { PaginatedResponseDto } from 'src/shared/dto/paginated-response.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('JWT-auth')
 export class IntegrationsController {
-  constructor(private readonly integrationService: IntegrationService) {}
+  constructor(
+    private readonly integrationService: IntegrationService,
+    private readonly accountService: AccountService,
+    private readonly integrationLogService: IntegrationLogService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -41,8 +48,26 @@ export class IntegrationsController {
   @ApiOperation({ summary: 'Create a new integration' })
   @ApiResponse({ status: 201, type: IntegrationDto })
   @ApiResponse({ status: 409, description: 'Slug already exists' })
-  async create(@Body() dto: CreateIntegrationDto): Promise<IntegrationDto> {
-    return this.integrationService.create(dto);
+  async create(@Body() dto: CreateIntegrationDto, @Req() req): Promise<IntegrationDto> {
+    const result = await this.integrationService.create(dto);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      const editableFields = (['eventType', 'theme', 'source', 'content'] as const)
+        .filter((f) => result[`is${f.charAt(0).toUpperCase() + f.slice(1)}Editable` as keyof typeof result]);
+      await this.integrationLogService.log({
+        action: IntegrationAction.INTEGRATION_CREATED,
+        severity: LogSeverity.INFO,
+        integrationId: result.id,
+        slug: result.slug,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        metadata: { integrationId: result.id, slug: result.slug, name: result.name, eventType: result.eventType, isActive: result.isActive, editableFields },
+      });
+    } catch {}
+
+    return result;
   }
 
   @Get()
@@ -80,8 +105,28 @@ export class IntegrationsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateIntegrationDto,
+    @Req() req,
   ): Promise<IntegrationDto> {
-    return this.integrationService.update(id, dto);
+    const result = await this.integrationService.update(id, dto);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      const changes = Object.entries(dto)
+        .filter(([, v]) => v !== undefined)
+        .map(([field, to]) => ({ field, to }));
+      await this.integrationLogService.log({
+        action: IntegrationAction.INTEGRATION_UPDATED,
+        severity: LogSeverity.INFO,
+        integrationId: id,
+        slug: result.slug,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        metadata: { integrationId: id, slug: result.slug, name: result.name, changes },
+      });
+    } catch {}
+
+    return result;
   }
 
   @Patch(':id/activate')
@@ -90,8 +135,24 @@ export class IntegrationsController {
   @ApiOperation({ summary: 'Activate integration' })
   @ApiResponse({ status: 200, type: IntegrationDto })
   @ApiResponse({ status: 404, description: 'Integration not found' })
-  async activate(@Param('id') id: string): Promise<IntegrationDto> {
-    return this.integrationService.activate(id);
+  async activate(@Param('id') id: string, @Req() req): Promise<IntegrationDto> {
+    const result = await this.integrationService.activate(id);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      await this.integrationLogService.log({
+        action: IntegrationAction.INTEGRATION_ACTIVATED,
+        severity: LogSeverity.INFO,
+        integrationId: id,
+        slug: result.slug,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        metadata: { integrationId: id, slug: result.slug, name: result.name },
+      });
+    } catch {}
+
+    return result;
   }
 
   @Patch(':id/deactivate')
@@ -100,7 +161,23 @@ export class IntegrationsController {
   @ApiOperation({ summary: 'Deactivate integration' })
   @ApiResponse({ status: 200, type: IntegrationDto })
   @ApiResponse({ status: 404, description: 'Integration not found' })
-  async deactivate(@Param('id') id: string): Promise<IntegrationDto> {
-    return this.integrationService.deactivate(id);
+  async deactivate(@Param('id') id: string, @Req() req): Promise<IntegrationDto> {
+    const result = await this.integrationService.deactivate(id);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      await this.integrationLogService.log({
+        action: IntegrationAction.INTEGRATION_DEACTIVATED,
+        severity: LogSeverity.INFO,
+        integrationId: id,
+        slug: result.slug,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        metadata: { integrationId: id, slug: result.slug, name: result.name },
+      });
+    } catch {}
+
+    return result;
   }
 }
