@@ -11,12 +11,22 @@ import {
   ExamType,
   StudyForm,
   AdmissionType,
+  SatisfactionScore,
 } from 'generated/prisma/client';
 
 const connectionString = `${process.env.DATABASE_URL}`;
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+
+function daysAgo(days: number, hours = 0, minutes = 0): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(d.getHours() - hours);
+  d.setMinutes(d.getMinutes() - minutes);
+  d.setSeconds(0, 0);
+  return d;
+}
 
 async function main() {
   console.log('🌱 Start seeding...');
@@ -430,9 +440,9 @@ async function main() {
       intent: AdmissionIntentCategory.DOCUMENT_SUBMISSION,
       noteText:
         'Не могу загрузить скан паспорта. Система выдает ошибку "Файл поврежден"',
-      createdAt: new Date('2025-01-15T10:30:00Z'),
-      updatedAt: new Date('2025-01-15T10:30:00Z'),
-      lastMessageAt: new Date('2025-01-15T10:30:00Z'),
+      createdAt: daysAgo(0, 2),
+      updatedAt: daysAgo(0, 2),
+      lastMessageAt: daysAgo(0, 2),
     },
   });
 
@@ -445,9 +455,9 @@ async function main() {
       priority: 8,
       intent: AdmissionIntentCategory.STATUS_VERIFICATION,
       noteText: 'Когда появятся результаты вступительных испытаний?',
-      createdAt: new Date('2025-01-15T09:15:00Z'),
-      updatedAt: new Date('2025-01-15T09:15:00Z'),
-      lastMessageAt: new Date('2025-01-15T09:15:00Z'),
+      createdAt: daysAgo(0, 3, 45),
+      updatedAt: daysAgo(0, 3, 45),
+      lastMessageAt: daysAgo(0, 3, 45),
     },
   });
 
@@ -460,9 +470,9 @@ async function main() {
       priority: 7,
       intent: AdmissionIntentCategory.TECHNICAL_ISSUES,
       noteText: 'Не приходит письмо для подтверждения email',
-      createdAt: new Date('2025-01-14T14:20:00Z'),
-      updatedAt: new Date('2025-01-14T14:20:00Z'),
-      lastMessageAt: new Date('2025-01-14T14:20:00Z'),
+      createdAt: daysAgo(0, 5),
+      updatedAt: daysAgo(0, 5),
+      lastMessageAt: daysAgo(0, 5),
     },
   });
 
@@ -475,9 +485,9 @@ async function main() {
       priority: 9,
       intent: AdmissionIntentCategory.PROGRAM_CONSULTATION,
       noteText: 'Хочу уточнить информацию о целевом обучении',
-      createdAt: new Date('2025-01-15T08:00:00Z'),
-      updatedAt: new Date('2025-01-15T08:00:00Z'),
-      lastMessageAt: new Date('2025-01-15T08:00:00Z'),
+      createdAt: daysAgo(0, 1),
+      updatedAt: daysAgo(0, 1),
+      lastMessageAt: daysAgo(0, 1),
     },
   });
 
@@ -493,10 +503,10 @@ async function main() {
       priority: 9,
       intent: AdmissionIntentCategory.ENROLLMENT,
       noteText: 'Вопрос по срокам зачисления',
-      assignedAt: new Date('2025-01-14T10:00:00Z'),
-      createdAt: new Date('2025-01-14T09:00:00Z'),
-      updatedAt: new Date('2025-01-14T11:15:00Z'),
-      lastMessageAt: new Date('2025-01-14T11:15:00Z'),
+      assignedAt: daysAgo(1, 1),
+      createdAt: daysAgo(1, 2),
+      updatedAt: daysAgo(0, 0, 45),
+      lastMessageAt: daysAgo(0, 0, 45),
     },
   });
 
@@ -509,10 +519,10 @@ async function main() {
       priority: 6,
       intent: AdmissionIntentCategory.PAYMENTS_CONTRACTS,
       noteText: 'Проблема с оплатой обучения',
-      assignedAt: new Date('2025-01-13T15:30:00Z'),
-      createdAt: new Date('2025-01-13T14:00:00Z'),
-      updatedAt: new Date('2025-01-14T16:45:00Z'),
-      lastMessageAt: new Date('2025-01-14T16:45:00Z'),
+      assignedAt: daysAgo(2, 0, 30),
+      createdAt: daysAgo(2, 1),
+      updatedAt: daysAgo(1, 0, 15),
+      lastMessageAt: daysAgo(1, 0, 15),
     },
   });
 
@@ -525,10 +535,10 @@ async function main() {
       priority: 7,
       intent: AdmissionIntentCategory.DORMITORY_HOUSING,
       noteText: 'Вопрос о предоставлении общежития',
-      assignedAt: new Date('2025-01-14T13:00:00Z'),
-      createdAt: new Date('2025-01-14T11:00:00Z'),
-      updatedAt: new Date('2025-01-15T09:30:00Z'),
-      lastMessageAt: new Date('2025-01-15T09:30:00Z'),
+      assignedAt: daysAgo(1, 2),
+      createdAt: daysAgo(1, 4),
+      updatedAt: daysAgo(0, 1, 30),
+      lastMessageAt: daysAgo(0, 1, 30),
     },
   });
 
@@ -544,10 +554,10 @@ async function main() {
       priority: 10,
       intent: AdmissionIntentCategory.TECHNICAL_ISSUES,
       noteText: 'Серьезная техническая проблема с системой загрузки документов',
-      assignedAt: new Date('2025-01-12T11:00:00Z'),
-      createdAt: new Date('2025-01-12T10:00:00Z'),
-      updatedAt: new Date('2025-01-12T11:30:00Z'),
-      lastMessageAt: new Date('2025-01-12T11:30:00Z'),
+      assignedAt: daysAgo(2, 0),
+      createdAt: daysAgo(2, 1),
+      updatedAt: daysAgo(2, 0, 30),
+      lastMessageAt: daysAgo(2, 0, 30),
     },
   });
 
@@ -563,11 +573,12 @@ async function main() {
       priority: 5,
       intent: AdmissionIntentCategory.GENERAL_INFO,
       noteText: 'Вопрос по расписанию вступительных испытаний',
-      assignedAt: new Date('2025-01-10T09:00:00Z'),
-      resolvedAt: new Date('2025-01-10T16:00:00Z'),
-      createdAt: new Date('2025-01-10T08:00:00Z'),
-      updatedAt: new Date('2025-01-10T16:00:00Z'),
-      lastMessageAt: new Date('2025-01-10T15:30:00Z'),
+      satisfactionScore: SatisfactionScore.GOOD,
+      assignedAt: daysAgo(3, 2),
+      resolvedAt: daysAgo(3, 0, 30),
+      createdAt: daysAgo(3, 3),
+      updatedAt: daysAgo(3, 0, 30),
+      lastMessageAt: daysAgo(3, 1),
     },
   });
 
@@ -583,12 +594,13 @@ async function main() {
       priority: 4,
       intent: AdmissionIntentCategory.DOCUMENT_SUBMISSION,
       noteText: 'Помощь с загрузкой документов',
-      assignedAt: new Date('2025-01-09T10:00:00Z'),
-      resolvedAt: new Date('2025-01-09T14:00:00Z'),
-      closedAt: new Date('2025-01-09T15:00:00Z'),
-      createdAt: new Date('2025-01-09T09:00:00Z'),
-      updatedAt: new Date('2025-01-09T15:00:00Z'),
-      lastMessageAt: new Date('2025-01-09T13:45:00Z'),
+      satisfactionScore: SatisfactionScore.EXCELLENT,
+      assignedAt: daysAgo(4, 3),
+      resolvedAt: daysAgo(4, 1),
+      closedAt: daysAgo(4, 0),
+      createdAt: daysAgo(4, 4),
+      updatedAt: daysAgo(4, 0),
+      lastMessageAt: daysAgo(4, 1, 15),
     },
   });
 
@@ -604,10 +616,10 @@ async function main() {
       priority: 6,
       intent: AdmissionIntentCategory.SCORES_COMPETITION,
       noteText: 'Нужна консультация по проходным баллам',
-      assignedAt: new Date('2025-01-13T12:00:00Z'),
-      createdAt: new Date('2025-01-13T10:00:00Z'),
-      updatedAt: new Date('2025-01-14T15:00:00Z'),
-      lastMessageAt: new Date('2025-01-14T15:00:00Z'),
+      assignedAt: daysAgo(1, 3),
+      createdAt: daysAgo(1, 5),
+      updatedAt: daysAgo(0, 2),
+      lastMessageAt: daysAgo(0, 2),
     },
   });
 
@@ -623,7 +635,7 @@ async function main() {
       content:
         'Здравствуйте! Я подал документы 10 января, но до сих пор нет информации о зачислении. Когда можно ожидать результаты?',
       status: 'SENT',
-      createdAt: new Date('2025-01-14T09:00:00Z'),
+      createdAt: daysAgo(1, 2),
     },
   });
 
@@ -633,10 +645,10 @@ async function main() {
       authorId: operator1.id,
       authorType: 'FROM_AGENT',
       content:
-        'Добрый день! Рассмотрение документов занимает до 10 рабочих дней. О результатах мы уведомим вас по email. Ориентировочно до 25 января.',
+        'Добрый день! Рассмотрение документов занимает до 10 рабочих дней. О результатах мы уведомим вас по email.',
       status: 'DELIVERED',
-      deliveredAt: new Date('2025-01-14T10:30:00Z'),
-      createdAt: new Date('2025-01-14T10:30:00Z'),
+      deliveredAt: daysAgo(1, 0, 30),
+      createdAt: daysAgo(1, 0, 30),
     },
   });
 
@@ -648,7 +660,7 @@ async function main() {
       content:
         'Спасибо за ответ. А где именно смотреть результаты? В личном кабинете или придет отдельное письмо?',
       status: 'SENT',
-      createdAt: new Date('2025-01-14T11:00:00Z'),
+      createdAt: daysAgo(1, 0),
     },
   });
 
@@ -660,9 +672,9 @@ async function main() {
       content:
         'Результаты появятся в вашем личном кабинете в разделе "Статус абитуриента". Также мы продублируем информацию на email.',
       status: 'SEEN',
-      deliveredAt: new Date('2025-01-14T11:15:00Z'),
-      seenAt: new Date('2025-01-14T11:20:00Z'),
-      createdAt: new Date('2025-01-14T11:15:00Z'),
+      deliveredAt: daysAgo(0, 0, 45),
+      seenAt: daysAgo(0, 0, 40),
+      createdAt: daysAgo(0, 0, 45),
     },
   });
 
@@ -678,7 +690,7 @@ async function main() {
       content:
         'Здравствуйте! Не могу оплатить обучение, система выдает ошибку при вводе данных карты.',
       status: 'SENT',
-      createdAt: new Date('2025-01-13T14:00:00Z'),
+      createdAt: daysAgo(2, 1),
     },
   });
 
@@ -690,8 +702,8 @@ async function main() {
       content:
         'Здравствуйте, Мария! Какая именно ошибка возникает? Попробуйте использовать другой браузер или очистить кэш.',
       status: 'DELIVERED',
-      deliveredAt: new Date('2025-01-13T15:30:00Z'),
-      createdAt: new Date('2025-01-13T15:30:00Z'),
+      deliveredAt: daysAgo(2, 0, 30),
+      createdAt: daysAgo(2, 0, 30),
     },
   });
 
@@ -703,7 +715,7 @@ async function main() {
       content:
         'Попробовала в Chrome и Firefox, везде пишет "Транзакция отклонена банком". Карта точно рабочая, другие платежи проходят.',
       status: 'SENT',
-      createdAt: new Date('2025-01-14T10:00:00Z'),
+      createdAt: daysAgo(1, 1),
     },
   });
 
@@ -715,7 +727,7 @@ async function main() {
       content:
         'Понял проблему. Свяжусь с платежным шлюзом. Ожидайте, решится в течение 24 часов.',
       status: 'SENT',
-      createdAt: new Date('2025-01-14T16:45:00Z'),
+      createdAt: daysAgo(1, 0, 15),
     },
   });
 
@@ -731,7 +743,7 @@ async function main() {
       content:
         'Система постоянно выдает ошибку 500 при попытке загрузить документы. Уже 3 дня не могу отправить справку об инвалидности.',
       status: 'SENT',
-      createdAt: new Date('2025-01-12T10:00:00Z'),
+      createdAt: daysAgo(2, 1),
     },
   });
 
@@ -743,8 +755,8 @@ async function main() {
       content:
         'Проблема требует эскалации до старшего оператора. Передаю тикет коллеге.',
       status: 'DELIVERED',
-      deliveredAt: new Date('2025-01-12T11:00:00Z'),
-      createdAt: new Date('2025-01-12T11:00:00Z'),
+      deliveredAt: daysAgo(2, 0),
+      createdAt: daysAgo(2, 0),
     },
   });
 
@@ -756,9 +768,9 @@ async function main() {
       content:
         'Здравствуйте! Мы обнаружили проблему в сервисе загрузки файлов. Техническая команда уже работает над исправлением. Ориентировочно проблема будет решена завтра.',
       status: 'SEEN',
-      deliveredAt: new Date('2025-01-12T11:30:00Z'),
-      seenAt: new Date('2025-01-12T11:35:00Z'),
-      createdAt: new Date('2025-01-12T11:30:00Z'),
+      deliveredAt: daysAgo(2, 0, 30),
+      seenAt: daysAgo(2, 0, 25),
+      createdAt: daysAgo(2, 0, 30),
     },
   });
 
@@ -774,7 +786,7 @@ async function main() {
       cause: EscalationCause.COMPLEX_ISSUE,
       causeComment:
         'Техническая проблема на стороне сервера, требуется вмешательство разработки',
-      escalatedAt: new Date('2025-01-12T11:00:00Z'),
+      escalatedAt: daysAgo(2, 0),
     },
   });
 
@@ -1008,9 +1020,10 @@ async function main() {
   console.log('\n=================================');
   console.log('✅ Seeding completed successfully!');
   console.log('=================================');
+
   console.log('\n📊 Database statistics:');
   console.log(`  👥 Accounts: ${accountsCount}`);
-  console.log(`  🎫 Tickets: ${ticketsCount}`);
+
   console.log(`  💬 Messages: ${messagesCount}`);
   console.log(`  📚 Exam scores: ${examScoresData.length}`);
   console.log(`  🎓 Programs: ${applicantProgramsData.length}`);
