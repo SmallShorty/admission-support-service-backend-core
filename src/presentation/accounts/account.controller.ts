@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -25,17 +26,23 @@ import {
 import { RegisterAccountUseCase } from 'src/application/use-cases/accounts/register-account.usecase';
 import { PaginatedResponseDto } from 'src/shared/dto/paginated-response.dto';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
 import { Account } from 'generated/prisma/client';
+import { AuditAction, AuditCategory, LogSeverity } from 'generated/prisma/enums';
 import { UpdateAccountDto } from 'src/application/dto/accounts/update-account.dto';
+import { JwtAuthGuard } from 'src/presentation/auth/guards/jwt-auth.guard';
 
 @Controller('accounts')
 export class AccountController {
   constructor(
     private readonly registerAccountUseCase: RegisterAccountUseCase,
     private readonly accountService: AccountService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Post('register')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new account' })
   @ApiBody({
@@ -69,8 +76,23 @@ export class AccountController {
   })
   async register(
     @Body() dto: RegisterAccountDto,
+    @Req() req,
   ): Promise<RegisterAccountResponseDto> {
-    return this.registerAccountUseCase.execute(dto);
+    const registrar = req.user
+      ? await this.accountService.account({ id: req.user.id }).then((a) =>
+          a
+            ? {
+                id: a.id,
+                email: a.email,
+                role: a.role!,
+                firstName: a.firstName,
+                lastName: a.lastName,
+                middleName: a.middleName,
+              }
+            : null,
+        )
+      : null;
+    return this.registerAccountUseCase.execute(dto, registrar);
   }
 
   @Get()
@@ -88,7 +110,8 @@ export class AccountController {
   }
 
   @Patch(':id')
-  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an existing account' })
   @ApiParam({
@@ -105,11 +128,50 @@ export class AccountController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateAccountDto,
+    @Req() req,
   ): Promise<Omit<Account, 'passwordHash'>> {
-    // В AccountService должен быть метод update, принимающий id и данные
-    return this.accountService.updateAccount({
+    const before = await this.accountService.account({ id });
+
+    const result = await this.accountService.updateAccount({
       where: { id },
       data: dto,
     });
+
+    try {
+      const actor = req.user
+        ? await this.accountService.account({ id: req.user.id }).then((a) =>
+            a
+              ? {
+                  id: a.id,
+                  email: a.email,
+                  role: a.role!,
+                  firstName: a.firstName,
+                  lastName: a.lastName,
+                  middleName: a.middleName,
+                }
+              : null,
+          )
+        : null;
+
+      const changes = Object.entries(dto)
+        .filter(([, v]) => v !== undefined)
+        .map(([field, to]) => ({
+          field,
+          from: before ? (before as Record<string, unknown>)[field] : undefined,
+          to,
+        }));
+
+      await this.auditLogService.log({
+        action: AuditAction.ACCOUNT_UPDATED,
+        category: AuditCategory.ACCOUNT,
+        severity: LogSeverity.INFO,
+        actor,
+        targetId: id,
+        targetType: 'Account',
+        metadata: { targetAccountId: id, changes },
+      });
+    } catch {}
+
+    return result;
   }
 }

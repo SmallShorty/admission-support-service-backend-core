@@ -17,13 +17,20 @@ import {
 } from '@nestjs/swagger';
 import { LoginDto } from 'src/application/dto/auth/login.dto';
 import { AuthService } from 'src/infrastructure/auth/auth.service';
+import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
+import { AuditAction, AuditCategory, LogSeverity } from 'generated/prisma/enums';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from 'src/shared/decorators/public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private accountService: AccountService,
+    private auditLogService: AuditLogService,
+  ) {}
 
   @Post('login')
   @Public()
@@ -56,7 +63,31 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(@Req() req) {
     const accessToken = req.headers.authorization?.split(' ')[1];
-    return this.authService.logout(accessToken, req.user.id);
+    const result = await this.authService.logout(accessToken, req.user.id);
+
+    try {
+      const account = await this.accountService.account({ id: req.user.id });
+      if (account) {
+        await this.auditLogService.log({
+          action: AuditAction.LOGOUT,
+          category: AuditCategory.AUTH,
+          severity: LogSeverity.INFO,
+          actor: {
+            id: account.id,
+            email: account.email,
+            role: account.role!,
+            firstName: account.firstName,
+            lastName: account.lastName,
+            middleName: account.middleName,
+          },
+          targetId: account.id,
+          targetType: 'Account',
+          metadata: { email: account.email },
+        });
+      }
+    } catch {}
+
+    return result;
   }
 
   @Get('profile')

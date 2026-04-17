@@ -6,14 +6,32 @@ import {
   RegisterAccountResponseDto,
 } from 'src/application/dto/accounts/register-account.dto';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
+import { AuditActorSnapshot } from 'src/application/dto/audit-log/create-audit-log.dto';
+import { AuditAction, AuditCategory, LogSeverity } from 'generated/prisma/enums';
 
 @Injectable()
 export class RegisterAccountUseCase {
-  constructor(private readonly accountService: AccountService) {}
+  constructor(
+    private readonly accountService: AccountService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
-  async execute(dto: RegisterAccountDto): Promise<RegisterAccountResponseDto> {
+  async execute(
+    dto: RegisterAccountDto,
+    registrar?: AuditActorSnapshot | null,
+  ): Promise<RegisterAccountResponseDto> {
     const existing = await this.accountService.account({ email: dto.email });
     if (existing) {
+      try {
+        await this.auditLogService.log({
+          action: AuditAction.ACCOUNT_REGISTERED,
+          category: AuditCategory.ACCOUNT,
+          severity: LogSeverity.WARN,
+          actor: registrar ?? null,
+          metadata: { email: dto.email, reason: 'DUPLICATE_EMAIL' },
+        });
+      } catch {}
       throw new Error('Account with this email already exists');
     }
 
@@ -29,6 +47,16 @@ export class RegisterAccountUseCase {
       authProvider: 'INTERNAL',
       role: dto.role,
     });
+
+    try {
+      await this.auditLogService.log({
+        action: AuditAction.ACCOUNT_REGISTERED,
+        category: AuditCategory.ACCOUNT,
+        severity: LogSeverity.INFO,
+        actor: registrar ?? null,
+        metadata: { email: dto.email, role: dto.role, generatedPasswordSent: true },
+      });
+    } catch {}
 
     return new RegisterAccountResponseDto(dto.email, rawPassword);
   }

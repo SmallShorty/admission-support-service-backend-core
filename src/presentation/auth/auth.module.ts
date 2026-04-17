@@ -7,6 +7,7 @@ import { AuthService } from 'src/infrastructure/auth/auth.service';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
 import { PrismaService } from 'src/infrastructure/prisma/prisma.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AuditLogModule } from 'src/presentation/audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
       inject: [ConfigService],
     }),
+    AuditLogModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, AccountService, PrismaService],
