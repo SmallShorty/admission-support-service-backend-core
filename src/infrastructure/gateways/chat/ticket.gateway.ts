@@ -10,9 +10,11 @@ import {
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MessageType, TicketStatus } from 'generated/prisma/client';
+import { AuditAction, AuditCategory, LogSeverity } from 'generated/prisma/enums';
 import { Server, Socket } from 'socket.io';
 import { TicketService } from 'src/infrastructure/tickets/ticket.service';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
 import { ResolveVariablesUseCase } from 'src/application/use-cases/tickets/resolve-variables.usecase';
 
 @WebSocketGateway({
@@ -32,6 +34,7 @@ export class TicketChatGateway
     private readonly jwtService: JwtService,
     private readonly accountService: AccountService,
     private readonly resolveVariablesUseCase: ResolveVariablesUseCase,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   // Handle new WS connection
@@ -163,6 +166,29 @@ export class TicketChatGateway
           `Variable resolution failed for ticket ${payload.ticketId}:`,
           err,
         );
+
+        try {
+          const actor = client.data.userId
+            ? await this.accountService.account({ id: client.data.userId })
+            : null;
+          await this.auditLogService.log({
+            action: AuditAction.MESSAGE_VARIABLE_RESOLUTION_FAILED,
+            category: AuditCategory.MESSAGING,
+            severity: LogSeverity.ERROR,
+            actor: actor
+              ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+              : null,
+            targetId: payload.ticketId,
+            targetType: 'Ticket',
+            metadata: {
+              ticketId: payload.ticketId,
+              failedVariables: err.response?.missingVariables ?? [],
+              messagePreview: payload.content?.slice(0, 100) ?? '',
+              errorMessage: err.response?.message ?? err.message ?? 'Unknown',
+            },
+          });
+        } catch {}
+
         client.emit('variableResolutionError', {
           code: err.response?.code || 'RESOLUTION_ERROR',
           missingVariables: err.response?.missingVariables || [],

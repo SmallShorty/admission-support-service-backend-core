@@ -18,12 +18,14 @@ import {
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { AdmissionIntentCategory } from 'generated/prisma/enums';
+import { AdmissionIntentCategory, AuditAction, AuditCategory, LogSeverity } from 'generated/prisma/enums';
 import { CreateTemplateDto } from 'src/application/dto/templates/request/create-template.dto';
 import { UpdateTemplateDto } from 'src/application/dto/templates/request/update-template.dto';
 import { TemplateDto } from 'src/application/dto/templates/response/template.dto';
 import { ResolvedTemplateDto } from 'src/application/dto/templates/response/resolved-template.dto';
 import { TemplateService } from 'src/infrastructure/prisma/templates.service';
+import { AccountService } from 'src/infrastructure/prisma/accounts.service';
+import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
 import { ResolveVariablesUseCase } from 'src/application/use-cases/tickets/resolve-variables.usecase';
 import { JwtAuthGuard } from 'src/presentation/auth/guards/jwt-auth.guard';
 
@@ -35,16 +37,35 @@ export class TemplateController {
   constructor(
     private readonly templateService: TemplateService,
     private readonly resolveVariablesUseCase: ResolveVariablesUseCase,
+    private readonly accountService: AccountService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new template' })
   @ApiResponse({ status: 201, type: TemplateDto })
   async create(
-    @Req() req: { user: { id: string } },
+    @Req() req,
     @Body() createDto: CreateTemplateDto,
   ): Promise<TemplateDto> {
-    return this.templateService.create({ ...createDto, createdBy: req.user.id });
+    const result = await this.templateService.create({ ...createDto, createdBy: req.user.id });
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      await this.auditLogService.log({
+        action: AuditAction.TEMPLATE_CREATED,
+        category: AuditCategory.TEMPLATE,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: result.id,
+        targetType: 'Template',
+        metadata: { templateId: result.id, alias: result.alias, title: result.title, category: result.category, isActive: result.isActive },
+      });
+    } catch {}
+
+    return result;
   }
 
   @Get()
@@ -110,21 +131,76 @@ export class TemplateController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateTemplateDto,
+    @Req() req,
   ): Promise<TemplateDto> {
-    return this.templateService.update(id, updateDto);
+    const result = await this.templateService.update(id, updateDto);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      const changes = Object.entries(updateDto)
+        .filter(([, v]) => v !== undefined)
+        .map(([field, to]) => ({ field, to }));
+      await this.auditLogService.log({
+        action: AuditAction.TEMPLATE_UPDATED,
+        category: AuditCategory.TEMPLATE,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: id,
+        targetType: 'Template',
+        metadata: { templateId: id, alias: result.alias, title: result.title, changes },
+      });
+    } catch {}
+
+    return result;
   }
 
   @Patch(':id/deactivate')
   @ApiOperation({ summary: 'Soft delete template' })
   @ApiResponse({ status: 200, type: TemplateDto })
-  async deactivate(@Param('id') id: string): Promise<TemplateDto> {
-    return this.templateService.deactivate(id);
+  async deactivate(@Param('id') id: string, @Req() req): Promise<TemplateDto> {
+    const result = await this.templateService.deactivate(id);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      await this.auditLogService.log({
+        action: AuditAction.TEMPLATE_DEACTIVATED,
+        category: AuditCategory.TEMPLATE,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: id,
+        targetType: 'Template',
+        metadata: { templateId: id, alias: result.alias, title: result.title },
+      });
+    } catch {}
+
+    return result;
   }
 
   @Patch(':id/activate')
   @ApiOperation({ summary: 'Restore deactivated template' })
   @ApiResponse({ status: 200, type: TemplateDto })
-  async activate(@Param('id') id: string): Promise<TemplateDto> {
-    return this.templateService.activate(id);
+  async activate(@Param('id') id: string, @Req() req): Promise<TemplateDto> {
+    const result = await this.templateService.activate(id);
+
+    try {
+      const actor = await this.accountService.account({ id: req.user.id });
+      await this.auditLogService.log({
+        action: AuditAction.TEMPLATE_ACTIVATED,
+        category: AuditCategory.TEMPLATE,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: id,
+        targetType: 'Template',
+        metadata: { templateId: id, alias: result.alias, title: result.title },
+      });
+    } catch {}
+
+    return result;
   }
 }

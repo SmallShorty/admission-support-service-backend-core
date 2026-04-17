@@ -9,6 +9,7 @@ import { TicketController } from './ticket.controller';
 import { PrismaService } from 'src/infrastructure/prisma/prisma.service';
 import { ResolveVariablesUseCase } from 'src/application/use-cases/tickets/resolve-variables.usecase';
 import { GetTicketVariablesUseCase } from 'src/application/use-cases/tickets/get-ticket-variables.usecase';
+import { AuditLogModule } from 'src/presentation/audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { GetTicketVariablesUseCase } from 'src/application/use-cases/tickets/get
       }),
       inject: [ConfigService],
     }),
+    AuditLogModule,
   ],
   controllers: [TicketController],
   providers: [

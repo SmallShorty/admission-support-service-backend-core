@@ -21,7 +21,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { TicketService } from 'src/infrastructure/tickets/ticket.service';
-import { TicketStatus, AccountRole } from 'generated/prisma/enums';
+import { TicketStatus, AccountRole, AuditAction, AuditCategory, LogSeverity } from 'generated/prisma/enums';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from 'src/shared/decorators/roles.decorator';
@@ -36,6 +36,8 @@ import {
   VariableResolvedDto,
 } from 'src/application/dto/tickets/index';
 import { GetTicketVariablesUseCase } from 'src/application/use-cases/tickets/get-ticket-variables.usecase';
+import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
+import { AccountService } from 'src/infrastructure/prisma/accounts.service';
 
 @ApiTags('Tickets')
 @ApiBearerAuth('JWT-auth')
@@ -46,6 +48,8 @@ export class TicketController {
     private readonly ticketService: TicketService,
     private readonly ticketGateway: TicketChatGateway,
     private readonly getTicketVariablesUseCase: GetTicketVariablesUseCase,
+    private readonly auditLogService: AuditLogService,
+    private readonly accountService: AccountService,
   ) {}
 
   @Get('my')
@@ -348,6 +352,26 @@ export class TicketController {
       .to(ticketId)
       .emit('newTicketMessage', systemMessage);
 
+    try {
+      const actor = await this.accountService.account({ id: accountId });
+      await this.auditLogService.log({
+        action: AuditAction.TICKET_TAKEN,
+        category: AuditCategory.TICKET,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: ticketId,
+        targetType: 'Ticket',
+        metadata: {
+          ticketId,
+          ticketStatus: ticket.status,
+          applicantId: ticket.applicant.id,
+          intent: ticket.category,
+        },
+      });
+    } catch {}
+
     return ticket;
   }
 
@@ -407,7 +431,7 @@ export class TicketController {
     @Body() body: EscalateTicketRequestDto,
   ) {
     const fromAgentId = req.user.id;
-    const ticket = await this.ticketService.escalateTicket(
+    const { ticket, previousStatus } = await this.ticketService.escalateTicket(
       ticketId,
       fromAgentId,
       body,
@@ -416,6 +440,32 @@ export class TicketController {
     // Emit WebSocket updates
     this.ticketGateway.emitTicketUpdate(ticket, fromAgentId);
     this.ticketGateway.emitQueueUpdate(ticket, 'updated');
+
+    try {
+      const [actor, toAgent] = await Promise.all([
+        this.accountService.account({ id: fromAgentId }),
+        this.accountService.account({ id: body.toAgentId }),
+      ]);
+      await this.auditLogService.log({
+        action: AuditAction.TICKET_ESCALATED,
+        category: AuditCategory.TICKET,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: ticketId,
+        targetType: 'Ticket',
+        metadata: {
+          ticketId,
+          toAgentId: body.toAgentId,
+          toAgentName: toAgent ? `${toAgent.lastName} ${toAgent.firstName}` : body.toAgentId,
+          cause: body.cause,
+          causeComment: body.causeComment,
+          previousStatus,
+          newStatus: ticket.status,
+        },
+      });
+    } catch {}
 
     return ticket;
   }
@@ -462,7 +512,7 @@ export class TicketController {
     @Body() body: UpdateTicketStatusDto,
   ) {
     const accountId = req.user.id;
-    const ticket = await this.ticketService.updateTicketStatus(
+    const { ticket, previousStatus } = await this.ticketService.updateTicketStatus(
       ticketId,
       accountId,
       body.status,
@@ -471,6 +521,21 @@ export class TicketController {
     // Emit WebSocket updates
     this.ticketGateway.emitTicketUpdate(ticket, accountId);
     this.ticketGateway.emitQueueUpdate(ticket, 'updated');
+
+    try {
+      const actor = await this.accountService.account({ id: accountId });
+      await this.auditLogService.log({
+        action: AuditAction.TICKET_STATUS_CHANGED,
+        category: AuditCategory.TICKET,
+        severity: LogSeverity.INFO,
+        actor: actor
+          ? { id: actor.id, email: actor.email, role: actor.role!, firstName: actor.firstName, lastName: actor.lastName, middleName: actor.middleName }
+          : null,
+        targetId: ticketId,
+        targetType: 'Ticket',
+        metadata: { ticketId, fromStatus: previousStatus, toStatus: body.status },
+      });
+    } catch {}
 
     return ticket;
   }

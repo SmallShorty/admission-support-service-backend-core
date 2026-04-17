@@ -6,11 +6,15 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../prisma/audit-log.service';
 import {
   MessageType,
   TicketStatus,
   AccountRole,
   EscalationCause,
+  AuditAction,
+  AuditCategory,
+  LogSeverity,
 } from 'generated/prisma/enums';
 import { Prisma } from 'generated/prisma/client';
 
@@ -132,7 +136,10 @@ export class TicketService {
     email: true,
   };
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogService: AuditLogService,
+  ) {}
 
   // ========== Helper Methods ==========
 
@@ -171,6 +178,14 @@ export class TicketService {
    */
   private validateAdminOrSupervisor(role: AccountRole | null): void {
     if (role !== AccountRole.ADMIN && role !== AccountRole.SUPERVISOR) {
+      try {
+        void this.auditLogService.log({
+          action: AuditAction.TICKET_ACCESS_FORBIDDEN,
+          category: AuditCategory.SECURITY,
+          severity: LogSeverity.ERROR,
+          metadata: { reason: 'Admin or Supervisor role required', attemptedAction: 'getAllQueue' },
+        });
+      } catch {}
       throw new ForbiddenException(
         'Access denied. Admin or Supervisor role required.',
       );
@@ -829,10 +844,22 @@ export class TicketService {
       }
 
       if (ticket.agentId !== fromAgentId) {
+        try {
+          await this.auditLogService.log({
+            action: AuditAction.TICKET_ESCALATION_FORBIDDEN,
+            category: AuditCategory.SECURITY,
+            severity: LogSeverity.ERROR,
+            targetId: ticketId,
+            targetType: 'Ticket',
+            metadata: { ticketId, fromAgentId, reason: 'Agent not assigned to ticket' },
+          });
+        } catch {}
         throw new UnauthorizedTicketAccessException(
           `Agent ${fromAgentId} is not assigned to ticket ${ticketId}`,
         );
       }
+
+      const previousStatus = ticket.status;
 
       // Create escalation audit record
       await tx.escalationTicketAudit.create({
@@ -863,7 +890,7 @@ export class TicketService {
       this.logger.log(
         `Ticket ${ticketId} successfully escalated to ${dto.toAgentId}`,
       );
-      return this.toTicketListResponse(updatedTicket);
+      return { ticket: this.toTicketListResponse(updatedTicket), previousStatus };
     });
   }
 
@@ -886,10 +913,26 @@ export class TicketService {
       }
 
       if (ticket.agentId !== accountId) {
+        try {
+          await this.auditLogService.log({
+            action: AuditAction.TICKET_ACCESS_FORBIDDEN,
+            category: AuditCategory.SECURITY,
+            severity: LogSeverity.ERROR,
+            targetId: ticketId,
+            targetType: 'Ticket',
+            metadata: {
+              ticketId,
+              reason: 'Agent not assigned to ticket for status update',
+              attemptedAction: 'updateTicketStatus',
+            },
+          });
+        } catch {}
         throw new UnauthorizedTicketAccessException(
           `Agent ${accountId} is not assigned to ticket ${ticketId}`,
         );
       }
+
+      const previousStatus = ticket.status;
 
       const data: Prisma.TicketUpdateInput = {
         status,
@@ -913,7 +956,7 @@ export class TicketService {
       });
 
       this.logger.log(`Ticket ${ticketId} status updated to ${status}`);
-      return this.toTicketListResponse(updatedTicket);
+      return { ticket: this.toTicketListResponse(updatedTicket), previousStatus };
     });
   }
 }
