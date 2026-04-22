@@ -84,6 +84,7 @@ export interface TicketListResponse {
   priorityValue: number | null;
   createdAt: string;
   lastMessageAt: string;
+  firstApplicantMessage: string | null;
 }
 
 export interface TicketDetailResponse extends TicketListResponse {
@@ -300,6 +301,7 @@ export class TicketService {
         ticket.lastMessageAt?.toISOString() ||
         ticket.createdAt?.toISOString() ||
         new Date().toISOString(),
+      firstApplicantMessage: ticket.messages?.[0]?.content ?? null,
     };
   }
 
@@ -487,6 +489,12 @@ export class TicketService {
           applicant: {
             select: this.applicantSelectFields,
           },
+          messages: {
+            where: { authorType: MessageType.FROM_CUSTOMER },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+            select: { content: true },
+          },
         },
         orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
         take,
@@ -547,6 +555,12 @@ export class TicketService {
           },
           agent: {
             select: this.agentSelectFields,
+          },
+          messages: {
+            where: { authorType: MessageType.FROM_CUSTOMER },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+            select: { content: true },
           },
         },
         orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],

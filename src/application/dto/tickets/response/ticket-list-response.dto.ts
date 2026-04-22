@@ -53,4 +53,7 @@ export class TicketListResponseDto {
 
   @ApiProperty({ example: '2024-01-15T15:45:00Z' })
   lastMessageAt: string;
+
+  @ApiProperty({ example: 'Здравствуйте, у меня вопрос...', nullable: true })
+  firstApplicantMessage: string | null;
 }
