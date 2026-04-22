@@ -3,11 +3,11 @@ import 'dotenv/config';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 import {
   PrismaClient,
   TicketStatus,
   AdmissionIntentCategory,
-  EscalationCause,
   ExamType,
   StudyForm,
   AdmissionType,
@@ -28,10 +28,150 @@ function daysAgo(days: number, hours = 0, minutes = 0): Date {
   return d;
 }
 
+const applicantNames = [
+  {
+    firstName: 'Алексей',
+    lastName: 'Иванов',
+    middleName: 'Дмитриевич',
+    email: 'alexey.ivanov@example.com',
+  },
+  {
+    firstName: 'Мария',
+    lastName: 'Петрова',
+    middleName: 'Андреевна',
+    email: 'maria.petrova@example.com',
+  },
+  {
+    firstName: 'Дмитрий',
+    lastName: 'Соколов',
+    middleName: 'Павлович',
+    email: 'dmitry.sokolov@example.com',
+  },
+  {
+    firstName: 'Ольга',
+    lastName: 'Козлова',
+    middleName: 'Игоревна',
+    email: 'olga.kozlova@example.com',
+  },
+  {
+    firstName: 'Сергей',
+    lastName: 'Морозов',
+    middleName: 'Владимирович',
+    email: 'sergey.morozov@example.com',
+  },
+  {
+    firstName: 'Елена',
+    lastName: 'Лебедева',
+    middleName: 'Сергеевна',
+    email: 'elena.lebedeva@example.com',
+  },
+  {
+    firstName: 'Павел',
+    lastName: 'Волков',
+    middleName: 'Иванович',
+    email: 'pavel.volkov@example.com',
+  },
+  {
+    firstName: 'Анна',
+    lastName: 'Соответствующая',
+    middleName: 'Петровна',
+    email: 'anna.sotvetsv@example.com',
+  },
+  {
+    firstName: 'Иван',
+    lastName: 'Смирнов',
+    middleName: 'Алексеевич',
+    email: 'ivan.smirnov@example.com',
+  },
+  {
+    firstName: 'Виктория',
+    lastName: 'Федорова',
+    middleName: 'Николаевна',
+    email: 'victoria.fedorova@example.com',
+  },
+  {
+    firstName: 'Константин',
+    lastName: 'Лавров',
+    middleName: 'Сергеевич',
+    email: 'konstantin.lavrov@example.com',
+  },
+  {
+    firstName: 'Наталья',
+    lastName: 'Архипова',
+    middleName: 'Вячеславовна',
+    email: 'natalya.arkhipova@example.com',
+  },
+  {
+    firstName: 'Андрей',
+    lastName: 'Казаков',
+    middleName: 'Геннадьевич',
+    email: 'andrey.kazakov@example.com',
+  },
+  {
+    firstName: 'Люба',
+    lastName: 'Орлова',
+    middleName: 'Максимовна',
+    email: 'luba.orlova@example.com',
+  },
+  {
+    firstName: 'Михаил',
+    lastName: 'Гордеев',
+    middleName: 'Юрьевич',
+    email: 'mikhail.gordeev@example.com',
+  },
+];
+
+const intents = [
+  AdmissionIntentCategory.TECHNICAL_ISSUES,
+  AdmissionIntentCategory.DEADLINES_TIMELINES,
+  AdmissionIntentCategory.DOCUMENT_SUBMISSION,
+  AdmissionIntentCategory.STATUS_VERIFICATION,
+  AdmissionIntentCategory.SCORES_COMPETITION,
+  AdmissionIntentCategory.PAYMENTS_CONTRACTS,
+  AdmissionIntentCategory.ENROLLMENT,
+  AdmissionIntentCategory.DORMITORY_HOUSING,
+  AdmissionIntentCategory.STUDIES_SCHEDULE,
+  AdmissionIntentCategory.EVENTS,
+  AdmissionIntentCategory.GENERAL_INFO,
+  AdmissionIntentCategory.PROGRAM_CONSULTATION,
+];
+
+const supportTexts = {
+  [AdmissionIntentCategory.TECHNICAL_ISSUES]:
+    'Не могу зайти в личный кабинет, система выдает ошибку 500',
+  [AdmissionIntentCategory.DEADLINES_TIMELINES]:
+    'Когда закончится приём документов?',
+  [AdmissionIntentCategory.DOCUMENT_SUBMISSION]:
+    'Не могу загрузить скан паспорта, ошибка при загрузке',
+  [AdmissionIntentCategory.STATUS_VERIFICATION]:
+    'Как узнать статус рассмотрения моих документов?',
+  [AdmissionIntentCategory.SCORES_COMPETITION]:
+    'Какие баллы нужны для поступления?',
+  [AdmissionIntentCategory.PAYMENTS_CONTRACTS]:
+    'Какова стоимость обучения на платном отделении?',
+  [AdmissionIntentCategory.ENROLLMENT]: 'Когда начинается обучение?',
+  [AdmissionIntentCategory.DORMITORY_HOUSING]:
+    'Можно ли получить место в общежитии?',
+  [AdmissionIntentCategory.STUDIES_SCHEDULE]:
+    'Какое расписание занятий на первом курсе?',
+  [AdmissionIntentCategory.EVENTS]: 'Когда проводится день открытых дверей?',
+  [AdmissionIntentCategory.GENERAL_INFO]:
+    'Какие документы нужны для поступления?',
+  [AdmissionIntentCategory.PROGRAM_CONSULTATION]:
+    'Расскажите подробнее о программе обучения',
+};
+
+const agentResponses = [
+  'Здравствуйте! Спасибо за обращение. Я помогу вам разобраться с этой проблемой.',
+  'Добрый день! Проверю информацию и скоро вам отвечу.',
+  'Здравствуйте! Вот ответ на ваш вопрос:',
+  'Спасибо за вопрос. Полезная информация:',
+];
+
 async function main() {
   console.log('🌱 Start seeding...');
 
-  // Clean existing data (correct order due to foreign keys)
+  // Clean existing data
   console.log('🧹 Cleaning existing data...');
   await prisma.ticketMessage.deleteMany();
   await prisma.escalationTicketAudit.deleteMany();
@@ -53,16 +193,15 @@ async function main() {
   const hashedPassword = await bcrypt.hash('admin', 10);
   const hashedUserPassword = await bcrypt.hash('user123', 10);
 
-  // ========== Create Users ==========
+  // ========== Create Staff ==========
 
-  // 1. Admin
   const admin = await prisma.account.create({
     data: {
       id: '11111111-1111-4111-8111-111111111111',
       email: 'admin@admin.com',
-      firstName: 'Админ',
-      lastName: 'Администраторов',
-      middleName: 'Системович',
+      firstName: 'Мокроусова',
+      lastName: 'Лариса',
+      middleName: 'Викторовна',
       role: 'ADMIN',
       authProvider: 'INTERNAL',
       status: 'ACTIVE',
@@ -71,7 +210,6 @@ async function main() {
   });
   console.log('👑 Created admin:', admin.email);
 
-  // 2. Supervisor
   const supervisor = await prisma.account.create({
     data: {
       id: '22222222-2222-4222-8222-222222222222',
@@ -87,735 +225,361 @@ async function main() {
   });
   console.log('👔 Created supervisor:', supervisor.email);
 
-  // 3. Operators
-  const operator1 = await prisma.account.create({
-    data: {
-      id: '33333333-3333-4333-8333-333333333333',
-      email: 'operator1@example.com',
-      firstName: 'Иван',
-      lastName: 'Петров',
-      middleName: 'Сергеевич',
-      role: 'OPERATOR',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedPassword,
-    },
-  });
-
-  const operator2 = await prisma.account.create({
-    data: {
-      id: '44444444-4444-4444-8444-444444444444',
-      email: 'operator2@example.com',
-      firstName: 'Анна',
-      lastName: 'Сидорова',
-      middleName: 'Владимировна',
-      role: 'OPERATOR',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedPassword,
-    },
-  });
-
-  const operator3 = await prisma.account.create({
-    data: {
-      id: '88888888-8888-4888-8888-888888888888',
-      email: 'operator3@example.com',
-      firstName: 'Михаил',
-      lastName: 'Кузнецов',
-      middleName: 'Алексеевич',
-      role: 'OPERATOR',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedPassword,
-    },
-  });
-
-  console.log('👨‍💼 Created 3 operators');
-
-  // 4. Applicants with extended data
-  const applicant1Account = await prisma.account.create({
-    data: {
-      id: '55555555-5555-4555-8555-555555555555',
-      email: 'ivanov.alexey@example.com',
-      firstName: 'Алексей',
-      lastName: 'Иванов',
-      middleName: 'Дмитриевич',
-      role: 'APPLICANT',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedUserPassword,
-    },
-  });
-
-  await prisma.applicant.create({
-    data: {
-      id: applicant1Account.id,
-      snils: '12345678901',
-      hasBvi: false,
-      hasSpecialQuota: false,
-      hasSeparateQuota: false,
-      hasTargetQuota: false,
-      hasPriorityRight: false,
-      originalDocumentReceived: true,
-      originalDocumentReceivedAt: new Date('2025-01-10T10:00:00Z'),
-    },
-  });
-
-  const applicant2Account = await prisma.account.create({
-    data: {
-      id: '66666666-6666-4666-8666-666666666666',
-      email: 'petrova.maria@example.com',
-      firstName: 'Мария',
-      lastName: 'Петрова',
-      middleName: 'Андреевна',
-      role: 'APPLICANT',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedUserPassword,
-    },
-  });
-
-  await prisma.applicant.create({
-    data: {
-      id: applicant2Account.id,
-      snils: '98765432101',
-      hasBvi: false,
-      hasSpecialQuota: true,
-      hasSeparateQuota: false,
-      hasTargetQuota: false,
-      hasPriorityRight: false,
-      originalDocumentReceived: false,
-    },
-  });
-
-  const applicant3Account = await prisma.account.create({
-    data: {
-      id: '77777777-7777-4777-8777-777777777777',
-      email: 'sokolov.dmitry@example.com',
-      firstName: 'Дмитрий',
-      lastName: 'Соколов',
-      middleName: 'Павлович',
-      role: 'APPLICANT',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedUserPassword,
-    },
-  });
-
-  await prisma.applicant.create({
-    data: {
-      id: applicant3Account.id,
-      snils: '55555555555',
-      hasBvi: true,
-      hasSpecialQuota: false,
-      hasSeparateQuota: false,
-      hasTargetQuota: false,
-      hasPriorityRight: true,
-      originalDocumentReceived: true,
-      originalDocumentReceivedAt: new Date('2025-01-12T14:30:00Z'),
-    },
-  });
-
-  const applicant4Account = await prisma.account.create({
-    data: {
-      id: '99999999-9999-4999-9999-999999999999',
-      email: 'kozlova.olga@example.com',
-      firstName: 'Ольга',
-      lastName: 'Козлова',
-      middleName: 'Игоревна',
-      role: 'APPLICANT',
-      authProvider: 'INTERNAL',
-      status: 'ACTIVE',
-      passwordHash: hashedUserPassword,
-    },
-  });
-
-  await prisma.applicant.create({
-    data: {
-      id: applicant4Account.id,
-      snils: '44444444444',
-      hasBvi: false,
-      hasSpecialQuota: false,
-      hasSeparateQuota: false,
-      hasTargetQuota: true,
-      hasPriorityRight: false,
-      originalDocumentReceived: false,
-    },
-  });
-
-  console.log('📚 Created 4 applicants with profiles');
-
-  // ========== Create Exam Scores ==========
-
-  const examScoresData = [
-    // Alexey Ivanov
-    {
-      applicantId: applicant1Account.id,
-      subjectName: 'Русский язык',
-      score: 85,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant1Account.id,
-      subjectName: 'Математика',
-      score: 92,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant1Account.id,
-      subjectName: 'Физика',
-      score: 88,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant1Account.id,
-      subjectName: 'Информатика',
-      score: 78,
-      type: ExamType.INTERNAL,
-    },
-
-    // Maria Petrova
-    {
-      applicantId: applicant2Account.id,
-      subjectName: 'Русский язык',
-      score: 94,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant2Account.id,
-      subjectName: 'Математика',
-      score: 88,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant2Account.id,
-      subjectName: 'Обществознание',
-      score: 96,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant2Account.id,
-      subjectName: 'Английский язык',
-      score: 82,
-      type: ExamType.EGE,
-    },
-
-    // Dmitry Sokolov
-    {
-      applicantId: applicant3Account.id,
-      subjectName: 'Русский язык',
-      score: 76,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant3Account.id,
-      subjectName: 'Математика',
-      score: 84,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant3Account.id,
-      subjectName: 'Физика',
-      score: 79,
-      type: ExamType.INTERNAL,
-    },
-
-    // Olga Kozlova
-    {
-      applicantId: applicant4Account.id,
-      subjectName: 'Русский язык',
-      score: 91,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant4Account.id,
-      subjectName: 'Математика',
-      score: 87,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant4Account.id,
-      subjectName: 'Биология',
-      score: 93,
-      type: ExamType.EGE,
-    },
-    {
-      applicantId: applicant4Account.id,
-      subjectName: 'Химия',
-      score: 89,
-      type: ExamType.INTERNAL,
-    },
+  const operatorNames = [
+    { firstName: 'Иван', lastName: 'Петров', middleName: 'Сергеевич' },
+    { firstName: 'Анна', lastName: 'Сидорова', middleName: 'Владимировна' },
+    { firstName: 'Михаил', lastName: 'Кузнецов', middleName: 'Алексеевич' },
+    { firstName: 'Наталья', lastName: 'Орлова', middleName: 'Игоревна' },
+    { firstName: 'Павел', lastName: 'Волков', middleName: 'Иванович' },
   ];
 
-  for (const score of examScoresData) {
-    await prisma.examScore.create({ data: score });
+  const operators: (typeof admin)[] = [];
+  for (let i = 0; i < operatorNames.length; i++) {
+    const op = await prisma.account.create({
+      data: {
+        id: uuidv4(),
+        email: `operator${i + 1}@example.com`,
+        firstName: operatorNames[i].firstName,
+        lastName: operatorNames[i].lastName,
+        middleName: operatorNames[i].middleName,
+        role: 'OPERATOR',
+        authProvider: 'INTERNAL',
+        status: 'ACTIVE',
+        passwordHash: hashedPassword,
+      },
+    });
+    operators.push(op);
+  }
+  console.log(`👨‍💼 Created ${operators.length} operators`);
+
+  // ========== Create Applicants ==========
+
+  const applicants: (typeof admin)[] = [];
+  for (let i = 0; i < applicantNames.length; i++) {
+    const applicantAccount = await prisma.account.create({
+      data: {
+        id: uuidv4(),
+        email: applicantNames[i].email,
+        firstName: applicantNames[i].firstName,
+        lastName: applicantNames[i].lastName,
+        middleName: applicantNames[i].middleName,
+        role: 'APPLICANT',
+        authProvider: 'INTERNAL',
+        status: 'ACTIVE',
+        passwordHash: hashedUserPassword,
+      },
+    });
+
+    await prisma.applicant.create({
+      data: {
+        id: applicantAccount.id,
+        snils: `${String(Math.floor(Math.random() * 100000000000)).padStart(11, '0')}`,
+        hasBvi: Math.random() < 0.1,
+        hasSpecialQuota: Math.random() < 0.15,
+        hasSeparateQuota: Math.random() < 0.1,
+        hasTargetQuota: Math.random() < 0.2,
+        hasPriorityRight: Math.random() < 0.15,
+        originalDocumentReceived: Math.random() < 0.8,
+        originalDocumentReceivedAt:
+          Math.random() < 0.8 ? daysAgo(Math.floor(Math.random() * 20)) : null,
+      },
+    });
+
+    applicants.push(applicantAccount);
+
+    // Create exam scores
+    const examSubjects = [
+      'Русский язык',
+      'Математика',
+      'Физика',
+      'Информатика',
+      'Обществознание',
+    ];
+    for (let j = 0; j < 3; j++) {
+      await prisma.examScore.create({
+        data: {
+          applicantId: applicantAccount.id,
+          subjectName: examSubjects[j],
+          score: 50 + Math.floor(Math.random() * 50),
+          type: Math.random() < 0.7 ? ExamType.EGE : ExamType.INTERNAL,
+        },
+      });
+    }
+
+    // Create programs
+    for (let j = 1; j <= (Math.random() < 0.7 ? 2 : 1); j++) {
+      await prisma.applicantProgram.create({
+        data: {
+          applicantId: applicantAccount.id,
+          programId: 100 * i + j,
+          programCode: `${String(Math.floor(Math.random() * 99)).padStart(2, '0')}.${String(Math.floor(Math.random() * 9) + 1).padStart(2, '0')}.${String(Math.floor(Math.random() * 9) + 1).padStart(2, '0')}`,
+          studyForm:
+            Math.random() < 0.8 ? StudyForm.FULL_TIME : StudyForm.PART_TIME,
+          admissionType: [
+            AdmissionType.BUDGET_COMPETITIVE,
+            AdmissionType.PAID,
+            AdmissionType.BUDGET_SPECIAL_QUOTA,
+            AdmissionType.TARGET,
+          ][Math.floor(Math.random() * 4)],
+          priority: j,
+        },
+      });
+    }
   }
 
-  console.log('📊 Created exam scores');
+  console.log(
+    `📚 Created ${applicants.length} applicants with profiles and exam scores`,
+  );
 
-  // ========== Create Applicant Programs ==========
+  // ========== Create ~45 Tickets with varied statuses ==========
 
-  const applicantProgramsData = [
-    // Alexey Ivanov
-    {
-      applicantId: applicant1Account.id,
-      programId: 101,
-      programCode: '01.03.02',
-      studyForm: StudyForm.FULL_TIME,
-      admissionType: AdmissionType.BUDGET_COMPETITIVE,
-      priority: 1,
-    },
-    {
-      applicantId: applicant1Account.id,
-      programId: 102,
-      programCode: '02.03.03',
-      studyForm: StudyForm.FULL_TIME,
-      admissionType: AdmissionType.PAID,
-      priority: 2,
-    },
+  let ticketCounter = 0;
 
-    // Maria Petrova
-    {
-      applicantId: applicant2Account.id,
-      programId: 201,
-      programCode: '38.03.01',
-      studyForm: StudyForm.FULL_TIME,
-      admissionType: AdmissionType.BUDGET_SPECIAL_QUOTA,
-      priority: 1,
-    },
-    {
-      applicantId: applicant2Account.id,
-      programId: 202,
-      programCode: '38.03.02',
-      studyForm: StudyForm.PART_TIME,
-      admissionType: AdmissionType.PAID,
-      priority: 2,
-    },
+  // NEW tickets (10)
+  for (let i = 0; i < 10; i++) {
+    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
+    const intent = intents[Math.floor(Math.random() * intents.length)];
+    const daysOld = Math.floor(Math.random() * 5);
 
-    // Dmitry Sokolov
-    {
-      applicantId: applicant3Account.id,
-      programId: 301,
-      programCode: '09.03.01',
-      studyForm: StudyForm.FULL_TIME,
-      admissionType: AdmissionType.BUDGET_BVI,
-      priority: 1,
-    },
-    {
-      applicantId: applicant3Account.id,
-      programId: 302,
-      programCode: '09.03.04',
-      studyForm: StudyForm.FULL_TIME,
-      admissionType: AdmissionType.BUDGET_COMPETITIVE,
-      priority: 2,
-    },
+    const ticket = await prisma.ticket.create({
+      data: {
+        id: uuidv4(),
+        applicantId: applicant.id,
+        agentId: null,
+        status: TicketStatus.NEW,
+        priority: Math.floor(Math.random() * 10) + 1,
+        intent,
+        noteText: supportTexts[intent],
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        updatedAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        lastMessageAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+      },
+    });
 
-    // Olga Kozlova
-    {
-      applicantId: applicant4Account.id,
-      programId: 401,
-      programCode: '31.05.01',
-      studyForm: StudyForm.FULL_TIME,
-      admissionType: AdmissionType.TARGET,
-      priority: 1,
-    },
-  ];
+    // First message from applicant
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: applicant.id,
+        authorType: 'FROM_CUSTOMER',
+        content: supportTexts[intent],
+        status: 'SENT',
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+      },
+    });
 
-  for (const program of applicantProgramsData) {
-    await prisma.applicantProgram.create({ data: program });
+    ticketCounter++;
   }
+  console.log(`🆕 Created ${ticketCounter} NEW tickets`);
 
-  console.log('🎓 Created applicant programs');
+  // IN_PROGRESS tickets (15)
+  let inProgressCount = 0;
+  for (let i = 0; i < 15; i++) {
+    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
+    const operator = operators[Math.floor(Math.random() * operators.length)];
+    const intent = intents[Math.floor(Math.random() * intents.length)];
+    const daysOld = Math.floor(Math.random() * 7) + 1;
 
-  // ========== Create Tickets with lastMessageAt ==========
+    const ticket = await prisma.ticket.create({
+      data: {
+        id: uuidv4(),
+        applicantId: applicant.id,
+        agentId: operator.id,
+        status: TicketStatus.IN_PROGRESS,
+        priority: Math.floor(Math.random() * 10) + 1,
+        intent,
+        noteText: supportTexts[intent],
+        assignedAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        updatedAt: daysAgo(0, Math.floor(Math.random() * 24)),
+        lastMessageAt: daysAgo(0, Math.floor(Math.random() * 24)),
+      },
+    });
 
-  // 1. NEW - tickets in queue (available for taking)
-  const newTicket1 = await prisma.ticket.create({
-    data: {
-      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      applicantId: applicant1Account.id,
-      agentId: null,
-      status: TicketStatus.NEW,
-      priority: 10,
-      intent: AdmissionIntentCategory.DOCUMENT_SUBMISSION,
-      noteText:
-        'Не могу загрузить скан паспорта. Система выдает ошибку "Файл поврежден"',
-      createdAt: daysAgo(0, 2),
-      updatedAt: daysAgo(0, 2),
-      lastMessageAt: daysAgo(0, 2),
-    },
-  });
+    // First message from applicant
+    const applicantMsgTime = daysAgo(daysOld, Math.floor(Math.random() * 24));
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: applicant.id,
+        authorType: 'FROM_CUSTOMER',
+        content: supportTexts[intent],
+        status: 'SENT',
+        createdAt: applicantMsgTime,
+      },
+    });
 
-  const newTicket2 = await prisma.ticket.create({
-    data: {
-      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      applicantId: applicant2Account.id,
-      agentId: null,
-      status: TicketStatus.NEW,
-      priority: 8,
-      intent: AdmissionIntentCategory.STATUS_VERIFICATION,
-      noteText: 'Когда появятся результаты вступительных испытаний?',
-      createdAt: daysAgo(0, 3, 45),
-      updatedAt: daysAgo(0, 3, 45),
-      lastMessageAt: daysAgo(0, 3, 45),
-    },
-  });
+    // Agent response
+    const agentMsgTime = daysAgo(daysOld - 1, Math.floor(Math.random() * 20));
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: operator.id,
+        authorType: 'FROM_AGENT',
+        content:
+          agentResponses[Math.floor(Math.random() * agentResponses.length)],
+        status: 'DELIVERED',
+        deliveredAt: agentMsgTime,
+        createdAt: agentMsgTime,
+      },
+    });
 
-  const newTicket3 = await prisma.ticket.create({
-    data: {
-      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-      applicantId: applicant3Account.id,
-      agentId: null,
-      status: TicketStatus.NEW,
-      priority: 7,
-      intent: AdmissionIntentCategory.TECHNICAL_ISSUES,
-      noteText: 'Не приходит письмо для подтверждения email',
-      createdAt: daysAgo(0, 5),
-      updatedAt: daysAgo(0, 5),
-      lastMessageAt: daysAgo(0, 5),
-    },
-  });
+    // Possible follow-up messages
+    if (Math.random() < 0.6) {
+      const followupTime = daysAgo(
+        Math.floor(Math.random() * (daysOld - 1)),
+        Math.floor(Math.random() * 24),
+      );
+      await prisma.ticketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          authorId: applicant.id,
+          authorType: 'FROM_CUSTOMER',
+          content: 'Спасибо за информацию!',
+          status: 'SENT',
+          createdAt: followupTime,
+        },
+      });
+    }
 
-  const newTicket4 = await prisma.ticket.create({
-    data: {
-      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-      applicantId: applicant4Account.id,
-      agentId: null,
-      status: TicketStatus.NEW,
-      priority: 9,
-      intent: AdmissionIntentCategory.PROGRAM_CONSULTATION,
-      noteText: 'Хочу уточнить информацию о целевом обучении',
-      createdAt: daysAgo(0, 1),
-      updatedAt: daysAgo(0, 1),
-      lastMessageAt: daysAgo(0, 1),
-    },
-  });
+    inProgressCount++;
+  }
+  console.log(`🔄 Created ${inProgressCount} IN_PROGRESS tickets`);
 
-  console.log('📋 Created 4 NEW tickets');
+  // RESOLVED tickets (12)
+  let resolvedCount = 0;
+  for (let i = 0; i < 12; i++) {
+    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
+    const operator = operators[Math.floor(Math.random() * operators.length)];
+    const intent = intents[Math.floor(Math.random() * intents.length)];
+    const daysOld = Math.floor(Math.random() * 15) + 3;
 
-  // 2. IN_PROGRESS - tickets being worked on by operators
-  const inProgressTicket1 = await prisma.ticket.create({
-    data: {
-      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
-      applicantId: applicant1Account.id,
-      agentId: operator1.id,
-      status: TicketStatus.IN_PROGRESS,
-      priority: 9,
-      intent: AdmissionIntentCategory.ENROLLMENT,
-      noteText: 'Вопрос по срокам зачисления',
-      assignedAt: daysAgo(1, 1),
-      createdAt: daysAgo(1, 2),
-      updatedAt: daysAgo(0, 0, 45),
-      lastMessageAt: daysAgo(0, 0, 45),
-    },
-  });
+    const ticket = await prisma.ticket.create({
+      data: {
+        id: uuidv4(),
+        applicantId: applicant.id,
+        agentId: operator.id,
+        status: TicketStatus.RESOLVED,
+        priority: Math.floor(Math.random() * 10) + 1,
+        intent,
+        noteText: supportTexts[intent],
+        satisfactionScore: [
+          SatisfactionScore.EXCELLENT,
+          SatisfactionScore.GOOD,
+          SatisfactionScore.AVERAGE,
+        ][Math.floor(Math.random() * 3)],
+        assignedAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        resolvedAt: daysAgo(
+          daysOld - Math.floor(Math.random() * 3),
+          Math.floor(Math.random() * 24),
+        ),
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        updatedAt: daysAgo(
+          daysOld - Math.floor(Math.random() * 3),
+          Math.floor(Math.random() * 24),
+        ),
+        lastMessageAt: daysAgo(
+          daysOld - Math.floor(Math.random() * 3),
+          Math.floor(Math.random() * 24),
+        ),
+      },
+    });
 
-  const inProgressTicket2 = await prisma.ticket.create({
-    data: {
-      id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      applicantId: applicant2Account.id,
-      agentId: operator2.id,
-      status: TicketStatus.IN_PROGRESS,
-      priority: 6,
-      intent: AdmissionIntentCategory.PAYMENTS_CONTRACTS,
-      noteText: 'Проблема с оплатой обучения',
-      assignedAt: daysAgo(2, 0, 30),
-      createdAt: daysAgo(2, 1),
-      updatedAt: daysAgo(1, 0, 15),
-      lastMessageAt: daysAgo(1, 0, 15),
-    },
-  });
+    // Message from applicant
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: applicant.id,
+        authorType: 'FROM_CUSTOMER',
+        content: supportTexts[intent],
+        status: 'SENT',
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+      },
+    });
 
-  const inProgressTicket3 = await prisma.ticket.create({
-    data: {
-      id: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
-      applicantId: applicant3Account.id,
-      agentId: operator3.id,
-      status: TicketStatus.IN_PROGRESS,
-      priority: 7,
-      intent: AdmissionIntentCategory.DORMITORY_HOUSING,
-      noteText: 'Вопрос о предоставлении общежития',
-      assignedAt: daysAgo(1, 2),
-      createdAt: daysAgo(1, 4),
-      updatedAt: daysAgo(0, 1, 30),
-      lastMessageAt: daysAgo(0, 1, 30),
-    },
-  });
+    // Agent response
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: operator.id,
+        authorType: 'FROM_AGENT',
+        content:
+          agentResponses[Math.floor(Math.random() * agentResponses.length)],
+        status: 'SEEN',
+        deliveredAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        seenAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        createdAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+      },
+    });
 
-  console.log('🔄 Created 3 IN_PROGRESS tickets');
+    resolvedCount++;
+  }
+  console.log(`✅ Created ${resolvedCount} RESOLVED tickets`);
 
-  // 3. ESCALATED - escalated tickets
-  const escalatedTicket = await prisma.ticket.create({
-    data: {
-      id: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
-      applicantId: applicant3Account.id,
-      agentId: supervisor.id,
-      status: TicketStatus.ESCALATED,
-      priority: 10,
-      intent: AdmissionIntentCategory.TECHNICAL_ISSUES,
-      noteText: 'Серьезная техническая проблема с системой загрузки документов',
-      assignedAt: daysAgo(2, 0),
-      createdAt: daysAgo(2, 1),
-      updatedAt: daysAgo(2, 0, 30),
-      lastMessageAt: daysAgo(2, 0, 30),
-    },
-  });
+  // CLOSED tickets (8)
+  let closedCount = 0;
+  for (let i = 0; i < 8; i++) {
+    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
+    const operator = operators[Math.floor(Math.random() * operators.length)];
+    const intent = intents[Math.floor(Math.random() * intents.length)];
+    const daysOld = Math.floor(Math.random() * 20) + 5;
 
-  console.log('⚠️ Created 1 ESCALATED ticket');
+    const ticket = await prisma.ticket.create({
+      data: {
+        id: uuidv4(),
+        applicantId: applicant.id,
+        agentId: operator.id,
+        status: TicketStatus.CLOSED,
+        priority: Math.floor(Math.random() * 10) + 1,
+        intent,
+        noteText: supportTexts[intent],
+        satisfactionScore: [
+          SatisfactionScore.EXCELLENT,
+          SatisfactionScore.GOOD,
+        ][Math.floor(Math.random() * 2)],
+        assignedAt: daysAgo(daysOld - 2, Math.floor(Math.random() * 20)),
+        resolvedAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        closedAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        updatedAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+        lastMessageAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+      },
+    });
 
-  // 4. RESOLVED - resolved tickets
-  const resolvedTicket = await prisma.ticket.create({
-    data: {
-      id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
-      applicantId: applicant1Account.id,
-      agentId: operator1.id,
-      status: TicketStatus.RESOLVED,
-      priority: 5,
-      intent: AdmissionIntentCategory.GENERAL_INFO,
-      noteText: 'Вопрос по расписанию вступительных испытаний',
-      satisfactionScore: SatisfactionScore.GOOD,
-      assignedAt: daysAgo(3, 2),
-      resolvedAt: daysAgo(3, 0, 30),
-      createdAt: daysAgo(3, 3),
-      updatedAt: daysAgo(3, 0, 30),
-      lastMessageAt: daysAgo(3, 1),
-    },
-  });
+    // Message from applicant
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: applicant.id,
+        authorType: 'FROM_CUSTOMER',
+        content: supportTexts[intent],
+        status: 'SENT',
+        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
+      },
+    });
 
-  console.log('✅ Created 1 RESOLVED ticket');
+    // Agent response
+    await prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        authorId: operator.id,
+        authorType: 'FROM_AGENT',
+        content:
+          agentResponses[Math.floor(Math.random() * agentResponses.length)],
+        status: 'SEEN',
+        deliveredAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        seenAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+        createdAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
+      },
+    });
 
-  // 5. CLOSED - closed tickets
-  const closedTicket = await prisma.ticket.create({
-    data: {
-      id: 'd4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a',
-      applicantId: applicant2Account.id,
-      agentId: operator2.id,
-      status: TicketStatus.CLOSED,
-      priority: 4,
-      intent: AdmissionIntentCategory.DOCUMENT_SUBMISSION,
-      noteText: 'Помощь с загрузкой документов',
-      satisfactionScore: SatisfactionScore.EXCELLENT,
-      assignedAt: daysAgo(4, 3),
-      resolvedAt: daysAgo(4, 1),
-      closedAt: daysAgo(4, 0),
-      createdAt: daysAgo(4, 4),
-      updatedAt: daysAgo(4, 0),
-      lastMessageAt: daysAgo(4, 1, 15),
-    },
-  });
-
-  console.log('🔒 Created 1 CLOSED ticket');
-
-  // 6. AWAITING_FEEDBACK - awaiting feedback tickets
-  const awaitingFeedbackTicket = await prisma.ticket.create({
-    data: {
-      id: 'e5f6a7b8-c9d4-4e0f-1a2b-3c4d5e6f7a8b',
-      applicantId: applicant4Account.id,
-      agentId: operator3.id,
-      status: TicketStatus.AWAITING_FEEDBACK,
-      priority: 6,
-      intent: AdmissionIntentCategory.SCORES_COMPETITION,
-      noteText: 'Нужна консультация по проходным баллам',
-      assignedAt: daysAgo(1, 3),
-      createdAt: daysAgo(1, 5),
-      updatedAt: daysAgo(0, 2),
-      lastMessageAt: daysAgo(0, 2),
-    },
-  });
-
-  console.log('💬 Created 1 AWAITING_FEEDBACK ticket');
-
-  // ========== Create Messages for IN_PROGRESS Ticket 1 ==========
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket1.id,
-      authorId: applicant1Account.id,
-      authorType: 'FROM_CUSTOMER',
-      content:
-        'Здравствуйте! Я подал документы 10 января, но до сих пор нет информации о зачислении. Когда можно ожидать результаты?',
-      status: 'SENT',
-      createdAt: daysAgo(1, 2),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket1.id,
-      authorId: operator1.id,
-      authorType: 'FROM_AGENT',
-      content:
-        'Добрый день! Рассмотрение документов занимает до 10 рабочих дней. О результатах мы уведомим вас по email.',
-      status: 'DELIVERED',
-      deliveredAt: daysAgo(1, 0, 30),
-      createdAt: daysAgo(1, 0, 30),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket1.id,
-      authorId: applicant1Account.id,
-      authorType: 'FROM_CUSTOMER',
-      content:
-        'Спасибо за ответ. А где именно смотреть результаты? В личном кабинете или придет отдельное письмо?',
-      status: 'SENT',
-      createdAt: daysAgo(1, 0),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket1.id,
-      authorId: operator1.id,
-      authorType: 'FROM_AGENT',
-      content:
-        'Результаты появятся в вашем личном кабинете в разделе "Статус абитуриента". Также мы продублируем информацию на email.',
-      status: 'SEEN',
-      deliveredAt: daysAgo(0, 0, 45),
-      seenAt: daysAgo(0, 0, 40),
-      createdAt: daysAgo(0, 0, 45),
-    },
-  });
-
-  console.log('💬 Created messages for IN_PROGRESS ticket 1');
-
-  // ========== Create Messages for IN_PROGRESS Ticket 2 ==========
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket2.id,
-      authorId: applicant2Account.id,
-      authorType: 'FROM_CUSTOMER',
-      content:
-        'Здравствуйте! Не могу оплатить обучение, система выдает ошибку при вводе данных карты.',
-      status: 'SENT',
-      createdAt: daysAgo(2, 1),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket2.id,
-      authorId: operator2.id,
-      authorType: 'FROM_AGENT',
-      content:
-        'Здравствуйте, Мария! Какая именно ошибка возникает? Попробуйте использовать другой браузер или очистить кэш.',
-      status: 'DELIVERED',
-      deliveredAt: daysAgo(2, 0, 30),
-      createdAt: daysAgo(2, 0, 30),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket2.id,
-      authorId: applicant2Account.id,
-      authorType: 'FROM_CUSTOMER',
-      content:
-        'Попробовала в Chrome и Firefox, везде пишет "Транзакция отклонена банком". Карта точно рабочая, другие платежи проходят.',
-      status: 'SENT',
-      createdAt: daysAgo(1, 1),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: inProgressTicket2.id,
-      authorId: operator2.id,
-      authorType: 'FROM_AGENT',
-      content:
-        'Понял проблему. Свяжусь с платежным шлюзом. Ожидайте, решится в течение 24 часов.',
-      status: 'SENT',
-      createdAt: daysAgo(1, 0, 15),
-    },
-  });
-
-  console.log('💬 Created messages for IN_PROGRESS ticket 2');
-
-  // ========== Create Messages for ESCALATED Ticket ==========
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: escalatedTicket.id,
-      authorId: applicant3Account.id,
-      authorType: 'FROM_CUSTOMER',
-      content:
-        'Система постоянно выдает ошибку 500 при попытке загрузить документы. Уже 3 дня не могу отправить справку об инвалидности.',
-      status: 'SENT',
-      createdAt: daysAgo(2, 1),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: escalatedTicket.id,
-      authorId: operator1.id,
-      authorType: 'FROM_AGENT',
-      content:
-        'Проблема требует эскалации до старшего оператора. Передаю тикет коллеге.',
-      status: 'DELIVERED',
-      deliveredAt: daysAgo(2, 0),
-      createdAt: daysAgo(2, 0),
-    },
-  });
-
-  await prisma.ticketMessage.create({
-    data: {
-      ticketId: escalatedTicket.id,
-      authorId: supervisor.id,
-      authorType: 'FROM_AGENT',
-      content:
-        'Здравствуйте! Мы обнаружили проблему в сервисе загрузки файлов. Техническая команда уже работает над исправлением. Ориентировочно проблема будет решена завтра.',
-      status: 'SEEN',
-      deliveredAt: daysAgo(2, 0, 30),
-      seenAt: daysAgo(2, 0, 25),
-      createdAt: daysAgo(2, 0, 30),
-    },
-  });
-
-  console.log('💬 Created messages for ESCALATED ticket');
-
-  // ========== Create Escalation Audit Record ==========
-
-  await prisma.escalationTicketAudit.create({
-    data: {
-      ticketId: escalatedTicket.id,
-      fromAgentId: operator1.id,
-      toAgentId: supervisor.id,
-      cause: EscalationCause.COMPLEX_ISSUE,
-      causeComment:
-        'Техническая проблема на стороне сервера, требуется вмешательство разработки',
-      escalatedAt: daysAgo(2, 0),
-    },
-  });
-
-  console.log('📝 Created escalation audit record');
-
-  // ========== Create WebSocket Connections (for testing) ==========
-
-  await prisma.userConnection.create({
-    data: {
-      accountId: operator1.id,
-      socketId: 'socket_test_001',
-      connectedAt: new Date(),
-    },
-  });
-
-  await prisma.userConnection.create({
-    data: {
-      accountId: operator2.id,
-      socketId: 'socket_test_002',
-      connectedAt: new Date(),
-    },
-  });
-
-  console.log('🔌 Created test WebSocket connections');
+    closedCount++;
+  }
+  console.log(`🔒 Created ${closedCount} CLOSED tickets`);
 
   // ========== Create Dynamic Variables ==========
 
   const dynamicVariablesData = [
-    // Identity
     {
       name: 'фио',
       description: 'Полное имя абитуриента (Фамилия Имя Отчество)',
@@ -858,7 +622,6 @@ async function main() {
       fallbackText: 'не указан',
       isSystem: true,
     },
-    // Quota flags
     {
       name: 'льгота_бви',
       description: 'Право на поступление без вступительных испытаний',
@@ -894,7 +657,6 @@ async function main() {
       fallbackText: 'нет',
       isSystem: true,
     },
-    // Documents
     {
       name: 'оригинал_сдан',
       description: 'Оригинал аттестата сдан',
@@ -909,7 +671,6 @@ async function main() {
       fallbackText: 'не указана',
       isSystem: true,
     },
-    // Programs
     {
       name: 'направление_1',
       description: 'Код программы первого приоритета',
@@ -952,7 +713,6 @@ async function main() {
       fallbackText: '0',
       isSystem: true,
     },
-    // Exam scores
     {
       name: 'балл_русский',
       description: 'Балл ЕГЭ по русскому языку',
@@ -988,27 +748,13 @@ async function main() {
       fallbackText: 'нет данных',
       isSystem: true,
     },
-    {
-      name: 'балл_химия',
-      description: 'Балл ЕГЭ/ВИ по химии',
-      sourceField: 'applicant.exams.Химия.score',
-      fallbackText: 'нет данных',
-      isSystem: true,
-    },
-    {
-      name: 'сумма_баллов',
-      description: 'Сумма всех баллов ЕГЭ',
-      sourceField: 'applicant.exams.total',
-      fallbackText: 'нет данных',
-      isSystem: true,
-    },
   ];
 
   await prisma.dynamicVariable.createMany({
     data: dynamicVariablesData,
   });
 
-  console.log('📝 Created 25 dynamic variables');
+  console.log(`📝 Created ${dynamicVariablesData.length} dynamic variables`);
 
   // ========== Final Statistics ==========
 
@@ -1023,30 +769,26 @@ async function main() {
 
   console.log('\n📊 Database statistics:');
   console.log(`  👥 Accounts: ${accountsCount}`);
-
+  console.log(`  📋 Tickets: ${ticketsCount}`);
   console.log(`  💬 Messages: ${messagesCount}`);
-  console.log(`  📚 Exam scores: ${examScoresData.length}`);
-  console.log(`  🎓 Programs: ${applicantProgramsData.length}`);
   console.log(`  📝 Dynamic variables: ${variablesCount}`);
 
   console.log('\n📋 Test accounts:');
   console.log('  👑 Admin:      admin@admin.com / admin');
   console.log('  👔 Supervisor: supervisor@example.com / admin');
-  console.log('  👨‍💼 Operator1:  operator1@example.com / admin');
-  console.log('  👨‍💼 Operator2:  operator2@example.com / admin');
-  console.log('  👨‍💼 Operator3:  operator3@example.com / admin');
-  console.log('  📚 Applicant1: ivanov.alexey@example.com / user123');
-  console.log('  📚 Applicant2: petrova.maria@example.com / user123');
-  console.log('  📚 Applicant3: sokolov.dmitry@example.com / user123');
-  console.log('  📚 Applicant4: kozlova.olga@example.com / user123');
+  for (let i = 0; i < operators.length; i++) {
+    console.log(`  👨‍💼 Operator${i + 1}:  operator${i + 1}@example.com / admin`);
+  }
+  for (let i = 0; i < Math.min(5, applicants.length); i++) {
+    console.log(`  📚 Applicant${i + 1}: ${applicantNames[i].email} / user123`);
+  }
 
-  console.log('\n📋 Ticket status distribution:');
-  console.log(`  🆕 NEW: 4 tickets`);
-  console.log(`  🔄 IN_PROGRESS: 3 tickets`);
-  console.log(`  ⚠️ ESCALATED: 1 ticket`);
-  console.log(`  ✅ RESOLVED: 1 ticket`);
-  console.log(`  🔒 CLOSED: 1 ticket`);
-  console.log(`  💬 AWAITING_FEEDBACK: 1 ticket`);
+  console.log('\n📋 Ticket distribution:');
+  console.log(`  🆕 NEW: ${ticketCounter}`);
+  console.log(`  🔄 IN_PROGRESS: ${inProgressCount}`);
+  console.log(`  ✅ RESOLVED: ${resolvedCount}`);
+  console.log(`  🔒 CLOSED: ${closedCount}`);
+  console.log(`  ⚠️ ESCALATED: 0`);
   console.log('=================================\n');
 }
 
