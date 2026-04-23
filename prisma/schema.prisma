@@ -128,6 +128,7 @@ model Ticket {
   status            TicketStatus             @default(NEW)
   priority          Int?                     @default(0) @db.SmallInt
   intent            AdmissionIntentCategory?
+  confidence        Float?                   @map("confidence") @db.DoublePrecision
   noteText          String                   @map("note_text")
   assignedAt        DateTime?                @map("assigned_at") @db.Timestamp(6)
   firstReplyAt      DateTime?                @map("first_reply_at") @db.Timestamp(6)
