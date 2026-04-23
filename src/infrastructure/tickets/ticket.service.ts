@@ -18,6 +18,12 @@ import {
 } from 'generated/prisma/enums';
 import { Prisma } from 'generated/prisma/client';
 
+// ========== System Message Constants ==========
+export const SYSTEM_MESSAGES = {
+  TICKET_ASSIGNED: 'assigned',
+  TICKET_ESCALATED: 'escalated',
+} as const;
+
 // ========== Domain Exceptions ==========
 export class TicketNotFoundException extends NotFoundException {
   constructor(ticketId?: string) {
@@ -184,7 +190,10 @@ export class TicketService {
           action: AuditAction.TICKET_ACCESS_FORBIDDEN,
           category: AuditCategory.SECURITY,
           severity: LogSeverity.ERROR,
-          metadata: { reason: 'Admin or Supervisor role required', attemptedAction: 'getAllQueue' },
+          metadata: {
+            reason: 'Admin or Supervisor role required',
+            attemptedAction: 'getAllQueue',
+          },
         });
       } catch {}
       throw new ForbiddenException(
@@ -459,7 +468,8 @@ export class TicketService {
           select: this.applicantSelectFields,
         },
         messages: {
-          orderBy: { createdAt: 'desc' },
+          where: { authorType: MessageType.FROM_CUSTOMER },
+          orderBy: { createdAt: 'asc' },
           take: 1,
         },
       },
@@ -820,7 +830,7 @@ export class TicketService {
             ticketId,
             authorId: accountId,
             authorType: MessageType.SYSTEM,
-            content: 'Ticket assigned to agent',
+            content: SYSTEM_MESSAGES.TICKET_ASSIGNED,
             status: 'SENT',
           },
         }),
@@ -865,7 +875,11 @@ export class TicketService {
             severity: LogSeverity.ERROR,
             targetId: ticketId,
             targetType: 'Ticket',
-            metadata: { ticketId, fromAgentId, reason: 'Agent not assigned to ticket' },
+            metadata: {
+              ticketId,
+              fromAgentId,
+              reason: 'Agent not assigned to ticket',
+            },
           });
         } catch {}
         throw new UnauthorizedTicketAccessException(
@@ -887,6 +901,16 @@ export class TicketService {
         },
       });
 
+      await tx.ticketMessage.create({
+        data: {
+          ticketId,
+          authorId: fromAgentId,
+          authorType: MessageType.SYSTEM,
+          content: SYSTEM_MESSAGES.TICKET_ESCALATED,
+          status: 'SENT',
+        },
+      });
+
       const updatedTicket = await tx.ticket.update({
         where: { id: ticketId },
         data: {
@@ -904,7 +928,10 @@ export class TicketService {
       this.logger.log(
         `Ticket ${ticketId} successfully escalated to ${dto.toAgentId}`,
       );
-      return { ticket: this.toTicketListResponse(updatedTicket), previousStatus };
+      return {
+        ticket: this.toTicketListResponse(updatedTicket),
+        previousStatus,
+      };
     });
   }
 
@@ -970,7 +997,10 @@ export class TicketService {
       });
 
       this.logger.log(`Ticket ${ticketId} status updated to ${status}`);
-      return { ticket: this.toTicketListResponse(updatedTicket), previousStatus };
+      return {
+        ticket: this.toTicketListResponse(updatedTicket),
+        previousStatus,
+      };
     });
   }
 }
