@@ -19,108 +19,181 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-function daysAgo(days: number, hours = 0, minutes = 0): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(d.getHours() - hours);
-  d.setMinutes(d.getMinutes() - minutes);
-  d.setSeconds(0, 0);
-  return d;
+// ========== Helper: случайная дата в интервале (период 29 апр – 5 мая 2026) ==========
+function randomDate(startDate: Date, endDate: Date): Date {
+  const diff = endDate.getTime() - startDate.getTime();
+  const randomDiff = Math.random() * diff;
+  return new Date(startDate.getTime() + randomDiff);
 }
 
-const applicantNames = [
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateScore(): number {
+  return randInt(70, 100);
+}
+
+// ========== Реальные программы бакалавриата ==========
+interface Program {
+  id: number;
+  code: string;
+  name: string;
+  studyForm: StudyForm;
+  requiredSubjects: string[];
+}
+
+const programsList: Program[] = [
   {
-    firstName: 'Алексей',
-    lastName: 'Иванов',
-    middleName: 'Дмитриевич',
-    email: 'alexey.ivanov@example.com',
+    id: 1,
+    code: '09.03.01',
+    name: 'Информатика и вычислительная техника',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Мария',
-    lastName: 'Петрова',
-    middleName: 'Андреевна',
-    email: 'maria.petrova@example.com',
+    id: 2,
+    code: '09.03.01.01',
+    name: 'Разработка программных комплексов (ТОП ИТ)',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Дмитрий',
-    lastName: 'Соколов',
-    middleName: 'Павлович',
-    email: 'dmitry.sokolov@example.com',
+    id: 3,
+    code: '09.03.02',
+    name: 'Информационные системы и технологии',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Ольга',
-    lastName: 'Козлова',
-    middleName: 'Игоревна',
-    email: 'olga.kozlova@example.com',
+    id: 4,
+    code: '09.03.02.01',
+    name: 'Разработка и внедрение корпоративных информационных систем (ТОП ИТ)',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Сергей',
-    lastName: 'Морозов',
-    middleName: 'Владимирович',
-    email: 'sergey.morozov@example.com',
+    id: 5,
+    code: '09.03.03.01',
+    name: 'Прикладная информатика (математическое и компьютерное моделирование)',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Елена',
-    lastName: 'Лебедева',
-    middleName: 'Сергеевна',
-    email: 'elena.lebedeva@example.com',
+    id: 6,
+    code: '09.03.03.02',
+    name: 'Прикладная информатика (управление данными)',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Павел',
-    lastName: 'Волков',
-    middleName: 'Иванович',
-    email: 'pavel.volkov@example.com',
+    id: 7,
+    code: '09.03.04',
+    name: 'Программная инженерия',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Информатика'],
   },
   {
-    firstName: 'Анна',
-    lastName: 'Соответствующая',
-    middleName: 'Петровна',
-    email: 'anna.sotvetsv@example.com',
+    id: 8,
+    code: '12.03.01',
+    name: 'Приборостроение',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Физика', 'Математика'],
   },
   {
-    firstName: 'Иван',
-    lastName: 'Смирнов',
-    middleName: 'Алексеевич',
-    email: 'ivan.smirnov@example.com',
+    id: 9,
+    code: '15.03.01',
+    name: 'Машиностроение',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
   {
-    firstName: 'Виктория',
-    lastName: 'Федорова',
-    middleName: 'Николаевна',
-    email: 'victoria.fedorova@example.com',
+    id: 10,
+    code: '15.03.01.01',
+    name: 'Многоосевые металлообрабатывающие центры',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
   {
-    firstName: 'Константин',
-    lastName: 'Лавров',
-    middleName: 'Сергеевич',
-    email: 'konstantin.lavrov@example.com',
+    id: 11,
+    code: '15.03.02',
+    name: 'Технологические машины и оборудование',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
   {
-    firstName: 'Наталья',
-    lastName: 'Архипова',
-    middleName: 'Вячеславовна',
-    email: 'natalya.arkhipova@example.com',
+    id: 12,
+    code: '15.03.04',
+    name: 'Автоматизация технологических процессов',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
   {
-    firstName: 'Андрей',
-    lastName: 'Казаков',
-    middleName: 'Геннадьевич',
-    email: 'andrey.kazakov@example.com',
+    id: 13,
+    code: '15.03.05',
+    name: 'Конструкторско-технологическое обеспечение машиностроения',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
   {
-    firstName: 'Люба',
-    lastName: 'Орлова',
-    middleName: 'Максимовна',
-    email: 'luba.orlova@example.com',
+    id: 14,
+    code: '15.03.05.01',
+    name: 'Высокопроизводительный металлообрабатывающий инструмент',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
   {
-    firstName: 'Михаил',
-    lastName: 'Гордеев',
-    middleName: 'Юрьевич',
-    email: 'mikhail.gordeev@example.com',
+    id: 15,
+    code: '15.03.06',
+    name: 'Мехатроника и робототехника',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
+  },
+  {
+    id: 16,
+    code: '15.05.01',
+    name: 'Проектирование технологических машин',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
+  },
+  {
+    id: 17,
+    code: '20.03.01',
+    name: 'Техносферная безопасность',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
+  },
+  {
+    id: 18,
+    code: '22.03.01',
+    name: 'Материаловедение и технологии материалов',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Химия'],
+  },
+  {
+    id: 19,
+    code: '27.03.01',
+    name: 'Стандартизация и метрология',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
+  },
+  {
+    id: 20,
+    code: '27.03.02',
+    name: 'Управление качеством',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
+  },
+  {
+    id: 21,
+    code: '27.03.04',
+    name: 'Управление в технических системах',
+    studyForm: StudyForm.FULL_TIME,
+    requiredSubjects: ['Русский язык', 'Математика', 'Физика'],
   },
 ];
 
+// ========== Категории обращений и тексты ==========
 const intents = [
   AdmissionIntentCategory.TECHNICAL_ISSUES,
   AdmissionIntentCategory.DEADLINES_TIMELINES,
@@ -136,9 +209,9 @@ const intents = [
   AdmissionIntentCategory.PROGRAM_CONSULTATION,
 ];
 
-const supportTexts = {
+const supportTexts: Record<AdmissionIntentCategory, string> = {
   [AdmissionIntentCategory.TECHNICAL_ISSUES]:
-    'Не могу зайти в личный кабинет, система выдает ошибку 500',
+    'Не могу зайти в личный кабинет, система выдаёт ошибку 500',
   [AdmissionIntentCategory.DEADLINES_TIMELINES]:
     'Когда закончится приём документов?',
   [AdmissionIntentCategory.DOCUMENT_SUBMISSION]:
@@ -161,18 +234,32 @@ const supportTexts = {
     'Расскажите подробнее о программе обучения',
 };
 
-const agentResponses = [
-  'Здравствуйте! Спасибо за обращение. Я помогу вам разобраться с этой проблемой.',
-  'Добрый день! Проверю информацию и скоро вам отвечу.',
-  'Здравствуйте! Вот ответ на ваш вопрос:',
-  'Спасибо за вопрос. Полезная информация:',
+// Быстрые ответы агентов (для положительного SLA)
+const fastAgentResponses = [
+  'Здравствуйте! Спасибо за обращение. Вот ответ на ваш вопрос:',
+  'Добрый день! Информирую вас:',
+  'Здравствуйте! Согласно правилам приёма,',
+  'Спасибо за вопрос. Сообщаю, что',
 ];
 
-async function main() {
-  console.log('🌱 Start seeding...');
+// Сложные вопросы для эскалации (длинные, нестандартные)
+const complexIssues = [
+  'У меня нестандартная ситуация: я закончил школу в другой стране, аттестат пока не прошёл нострификацию. Могу ли я подать документы?',
+  'Мой СНИЛС не проходит проверку в системе, хотя данные верны. Говорят, ошибка в базе ПФР. Что делать?',
+  'Я победитель всероссийской олимпиады по физике, но мой диплом ещё не загружен в реестр Минобрнауки. Как подтвердить льготу?',
+  'У меня есть целевое направление от предприятия, но оно оформлено на другое направление подготовки. Можно ли перезаключить?',
+  'Я проходил военную службу, есть ли у меня преимущество при зачислении? Нужно ли предоставлять дополнительные справки?',
+  'Мои оригиналы документов были утеряны при пересылке. Восстановление через архив может занять месяц. Что мне делать?',
+  'Я хочу поступить одновременно на две программы в рамках одной специальности. Возможно ли это? Как правильно подать заявления?',
+];
 
-  // Clean existing data
-  console.log('🧹 Cleaning existing data...');
+// ========== Основная функция ==========
+async function main() {
+  console.log(
+    '🌱 Seeding with POSITIVE support metrics, custom templates and integrations...',
+  );
+
+  // Очистка
   await prisma.ticketMessage.deleteMany();
   await prisma.escalationTicketAudit.deleteMany();
   await prisma.userConnection.deleteMany();
@@ -187,14 +274,11 @@ async function main() {
   await prisma.analyticsSnapshot.deleteMany();
   await prisma.account.deleteMany();
 
-  console.log('✅ Cleaned existing data');
-
-  // Hash passwords
+  // Хеши паролей
   const hashedPassword = await bcrypt.hash('admin', 10);
   const hashedUserPassword = await bcrypt.hash('user123', 10);
 
-  // ========== Create Staff ==========
-
+  // ========== 1. Сотрудники ==========
   const admin = await prisma.account.create({
     data: {
       id: '11111111-1111-4111-8111-111111111111',
@@ -208,7 +292,6 @@ async function main() {
       passwordHash: hashedPassword,
     },
   });
-  console.log('👑 Created admin:', admin.email);
 
   const supervisor = await prisma.account.create({
     data: {
@@ -223,7 +306,6 @@ async function main() {
       passwordHash: hashedPassword,
     },
   });
-  console.log('👔 Created supervisor:', supervisor.email);
 
   const operatorNames = [
     { firstName: 'Иван', lastName: 'Петров', middleName: 'Сергеевич' },
@@ -231,9 +313,9 @@ async function main() {
     { firstName: 'Михаил', lastName: 'Кузнецов', middleName: 'Алексеевич' },
     { firstName: 'Наталья', lastName: 'Орлова', middleName: 'Игоревна' },
     { firstName: 'Павел', lastName: 'Волков', middleName: 'Иванович' },
+    { firstName: 'Ольга', lastName: 'Морозова', middleName: 'Дмитриевна' },
   ];
-
-  const operators: (typeof admin)[] = [];
+  const operators: Awaited<ReturnType<typeof prisma.account.create>>[] = [];
   for (let i = 0; i < operatorNames.length; i++) {
     const op = await prisma.account.create({
       data: {
@@ -252,17 +334,202 @@ async function main() {
   }
   console.log(`👨‍💼 Created ${operators.length} operators`);
 
-  // ========== Create Applicants ==========
+  // ========== 2. Абитуриенты (30 человек) ==========
+  const applicantNames = [
+    {
+      firstName: 'Алексей',
+      lastName: 'Иванов',
+      middleName: 'Дмитриевич',
+      email: 'alexey.ivanov@example.com',
+    },
+    {
+      firstName: 'Мария',
+      lastName: 'Петрова',
+      middleName: 'Андреевна',
+      email: 'maria.petrova@example.com',
+    },
+    {
+      firstName: 'Дмитрий',
+      lastName: 'Соколов',
+      middleName: 'Павлович',
+      email: 'dmitry.sokolov@example.com',
+    },
+    {
+      firstName: 'Ольга',
+      lastName: 'Козлова',
+      middleName: 'Игоревна',
+      email: 'olga.kozlova@example.com',
+    },
+    {
+      firstName: 'Сергей',
+      lastName: 'Морозов',
+      middleName: 'Владимирович',
+      email: 'sergey.morozov@example.com',
+    },
+    {
+      firstName: 'Елена',
+      lastName: 'Лебедева',
+      middleName: 'Сергеевна',
+      email: 'elena.lebedeva@example.com',
+    },
+    {
+      firstName: 'Павел',
+      lastName: 'Волков',
+      middleName: 'Иванович',
+      email: 'pavel.volkov@example.com',
+    },
+    {
+      firstName: 'Анна',
+      lastName: 'Сотникова',
+      middleName: 'Петровна',
+      email: 'anna.sotnikova@example.com',
+    },
+    {
+      firstName: 'Иван',
+      lastName: 'Смирнов',
+      middleName: 'Алексеевич',
+      email: 'ivan.smirnov@example.com',
+    },
+    {
+      firstName: 'Виктория',
+      lastName: 'Фёдорова',
+      middleName: 'Николаевна',
+      email: 'victoria.fedorova@example.com',
+    },
+    {
+      firstName: 'Константин',
+      lastName: 'Лавров',
+      middleName: 'Сергеевич',
+      email: 'konstantin.lavrov@example.com',
+    },
+    {
+      firstName: 'Наталья',
+      lastName: 'Архипова',
+      middleName: 'Вячеславовна',
+      email: 'natalya.arkhipova@example.com',
+    },
+    {
+      firstName: 'Андрей',
+      lastName: 'Казаков',
+      middleName: 'Геннадьевич',
+      email: 'andrey.kazakov@example.com',
+    },
+    {
+      firstName: 'Любовь',
+      lastName: 'Орлова',
+      middleName: 'Максимовна',
+      email: 'lubov.orlova@example.com',
+    },
+    {
+      firstName: 'Михаил',
+      lastName: 'Гордеев',
+      middleName: 'Юрьевич',
+      email: 'mikhail.gordeev@example.com',
+    },
+    {
+      firstName: 'Татьяна',
+      lastName: 'Никитина',
+      middleName: 'Сергеевна',
+      email: 'tatiana.nikitina@example.com',
+    },
+    {
+      firstName: 'Артём',
+      lastName: 'Кузнецов',
+      middleName: 'Андреевич',
+      email: 'artem.kuznetsov@example.com',
+    },
+    {
+      firstName: 'Екатерина',
+      lastName: 'Васильева',
+      middleName: 'Игоревна',
+      email: 'ekaterina.vasilyeva@example.com',
+    },
+    {
+      firstName: 'Денис',
+      lastName: 'Павлов',
+      middleName: 'Романович',
+      email: 'denis.pavlov@example.com',
+    },
+    {
+      firstName: 'Анастасия',
+      lastName: 'Семёнова',
+      middleName: 'Алексеевна',
+      email: 'anastasia.semenova@example.com',
+    },
+    {
+      firstName: 'Владислав',
+      lastName: 'Егоров',
+      middleName: 'Дмитриевич',
+      email: 'vladislav.egorov@example.com',
+    },
+    {
+      firstName: 'Юлия',
+      lastName: 'Михайлова',
+      middleName: 'Владимировна',
+      email: 'yulia.mikhailova@example.com',
+    },
+    {
+      firstName: 'Григорий',
+      lastName: 'Тарасов',
+      middleName: 'Иванович',
+      email: 'grigory.tarasov@example.com',
+    },
+    {
+      firstName: 'Дарья',
+      lastName: 'Белова',
+      middleName: 'Павловна',
+      email: 'daria.belova@example.com',
+    },
+    {
+      firstName: 'Никита',
+      lastName: 'Комаров',
+      middleName: 'Александрович',
+      email: 'nikita.komarov@example.com',
+    },
+    {
+      firstName: 'Полина',
+      lastName: 'Крылова',
+      middleName: 'Максимовна',
+      email: 'polina.krylova@example.com',
+    },
+    {
+      firstName: 'Максим',
+      lastName: 'Гусев',
+      middleName: 'Сергеевич',
+      email: 'maxim.gusev@example.com',
+    },
+    {
+      firstName: 'Арина',
+      lastName: 'Зайцева',
+      middleName: 'Денисовна',
+      email: 'arina.zaytseva@example.com',
+    },
+    {
+      firstName: 'Роман',
+      lastName: 'Виноградов',
+      middleName: 'Петрович',
+      email: 'roman.vinogradov@example.com',
+    },
+    {
+      firstName: 'Ксения',
+      lastName: 'Борисова',
+      middleName: 'Андреевна',
+      email: 'ksenia.borisova@example.com',
+    },
+  ];
 
-  const applicants: (typeof admin)[] = [];
-  for (let i = 0; i < applicantNames.length; i++) {
-    const applicantAccount = await prisma.account.create({
+  const applicants: Awaited<ReturnType<typeof prisma.account.create>>[] = [];
+  const startCampaign = new Date(2026, 3, 29); // 29 апреля 2026
+  const endCampaign = new Date(2026, 4, 5); // 5 мая 2026
+
+  for (const nameData of applicantNames) {
+    const account = await prisma.account.create({
       data: {
         id: uuidv4(),
-        email: applicantNames[i].email,
-        firstName: applicantNames[i].firstName,
-        lastName: applicantNames[i].lastName,
-        middleName: applicantNames[i].middleName,
+        email: nameData.email,
+        firstName: nameData.firstName,
+        lastName: nameData.lastName,
+        middleName: nameData.middleName,
         role: 'APPLICANT',
         authProvider: 'INTERNAL',
         status: 'ACTIVE',
@@ -270,521 +537,366 @@ async function main() {
       },
     });
 
+    const snils = `${randInt(10000000000, 99999999999)}`;
     await prisma.applicant.create({
       data: {
-        id: applicantAccount.id,
-        snils: `${String(Math.floor(Math.random() * 100000000000)).padStart(11, '0')}`,
-        hasBvi: Math.random() < 0.1,
-        hasSpecialQuota: Math.random() < 0.15,
-        hasSeparateQuota: Math.random() < 0.1,
-        hasTargetQuota: Math.random() < 0.2,
-        hasPriorityRight: Math.random() < 0.15,
-        originalDocumentReceived: Math.random() < 0.8,
+        id: account.id,
+        snils,
+        hasBvi: Math.random() < 0.05,
+        hasSpecialQuota: Math.random() < 0.1,
+        hasSeparateQuota: Math.random() < 0.08,
+        hasTargetQuota: Math.random() < 0.12,
+        hasPriorityRight: Math.random() < 0.1,
+        originalDocumentReceived: Math.random() < 0.85,
         originalDocumentReceivedAt:
-          Math.random() < 0.8 ? daysAgo(Math.floor(Math.random() * 20)) : null,
+          Math.random() < 0.85 ? randomDate(startCampaign, endCampaign) : null,
       },
     });
 
-    applicants.push(applicantAccount);
-
-    // Create exam scores
-    const examSubjects = [
-      'Русский язык',
-      'Математика',
-      'Физика',
-      'Информатика',
-      'Обществознание',
-    ];
-    for (let j = 0; j < 3; j++) {
-      await prisma.examScore.create({
-        data: {
-          applicantId: applicantAccount.id,
-          subjectName: examSubjects[j],
-          score: 50 + Math.floor(Math.random() * 50),
-          type: Math.random() < 0.7 ? ExamType.EGE : ExamType.INTERNAL,
-        },
-      });
+    // Выбор 1-3 программ и генерация баллов
+    const programCount = randInt(1, 3);
+    const shuffled = [...programsList].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, programCount);
+    const requiredSubjectsSet = new Set<string>();
+    for (const prog of selected) {
+      prog.requiredSubjects.forEach((s) => requiredSubjectsSet.add(s));
     }
+    if (!requiredSubjectsSet.has('Русский язык'))
+      requiredSubjectsSet.add('Русский язык');
+    if (!requiredSubjectsSet.has('Математика'))
+      requiredSubjectsSet.add('Математика');
+    const examScoresData = Array.from(requiredSubjectsSet).map((sub) => ({
+      applicantId: account.id,
+      subjectName: sub,
+      score: generateScore(),
+      type: ExamType.EGE,
+    }));
+    await prisma.examScore.createMany({ data: examScoresData });
 
-    // Create programs
-    for (let j = 1; j <= (Math.random() < 0.7 ? 2 : 1); j++) {
+    for (let idx = 0; idx < selected.length; idx++) {
+      const prog = selected[idx];
+      let admissionType: AdmissionType = AdmissionType.BUDGET_COMPETITIVE;
+      if (prog.id % 3 === 0) admissionType = AdmissionType.PAID;
+      else if (prog.id % 5 === 0) admissionType = AdmissionType.TARGET;
+      else if (prog.id % 7 === 0)
+        admissionType = AdmissionType.BUDGET_SPECIAL_QUOTA;
+
       await prisma.applicantProgram.create({
         data: {
-          applicantId: applicantAccount.id,
-          programId: 100 * i + j,
-          programCode: `${String(Math.floor(Math.random() * 99)).padStart(2, '0')}.${String(Math.floor(Math.random() * 9) + 1).padStart(2, '0')}.${String(Math.floor(Math.random() * 9) + 1).padStart(2, '0')}`,
-          programName: 'Название направления',
-          studyForm:
-            Math.random() < 0.8 ? StudyForm.FULL_TIME : StudyForm.PART_TIME,
-          admissionType: [
-            AdmissionType.BUDGET_COMPETITIVE,
-            AdmissionType.PAID,
-            AdmissionType.BUDGET_SPECIAL_QUOTA,
-            AdmissionType.TARGET,
-          ][Math.floor(Math.random() * 4)],
-          priority: j,
+          applicantId: account.id,
+          programId: prog.id,
+          programCode: prog.code,
+          programName: prog.name,
+          studyForm: prog.studyForm,
+          admissionType,
+          priority: idx + 1,
         },
       });
     }
+    applicants.push(account);
   }
-
   console.log(
-    `📚 Created ${applicants.length} applicants with profiles and exam scores`,
+    `📚 Created ${applicants.length} applicants with exam scores and program applications`,
   );
 
-  // ========== Create ~45 Tickets with varied statuses ==========
+  // ========== 3. Тикеты с положительной статистикой ==========
+  // Распределение: NEW (5%), IN_PROGRESS (15%), RESOLVED (40%), CLOSED (35%), ESCALATED (5%)
+  // Всего ~100 тикетов, чтобы недельная статистика была ~75-80 – сделаем 95 тикетов.
+  const distribution = [
+    {
+      status: TicketStatus.NEW,
+      count: 5,
+      hasAgent: false,
+      hasResolution: false,
+      hasClose: false,
+      escalation: false,
+    },
+    {
+      status: TicketStatus.IN_PROGRESS,
+      count: 14,
+      hasAgent: true,
+      hasResolution: false,
+      hasClose: false,
+      escalation: false,
+    },
+    {
+      status: TicketStatus.RESOLVED,
+      count: 38,
+      hasAgent: true,
+      hasResolution: true,
+      hasClose: false,
+      escalation: false,
+    },
+    {
+      status: TicketStatus.CLOSED,
+      count: 33,
+      hasAgent: true,
+      hasResolution: true,
+      hasClose: true,
+      escalation: false,
+    },
+    {
+      status: TicketStatus.ESCALATED,
+      count: 5,
+      hasAgent: true,
+      hasResolution: true,
+      hasClose: false,
+      escalation: true,
+    },
+  ];
 
-  let ticketCounter = 0;
+  let totalTickets = 0;
+  for (const dist of distribution) {
+    for (let i = 0; i < dist.count; i++) {
+      const applicant =
+        applicants[Math.floor(Math.random() * applicants.length)];
+      // Для эскалированных используем сложные вопросы
+      const isEscalated = dist.escalation;
+      const intent = intents[Math.floor(Math.random() * intents.length)];
+      const createdAt = randomDate(startCampaign, endCampaign);
+      let assignedAt: Date | null = null;
+      let firstReplyAt: Date | null = null;
+      let resolvedAt: Date | null = null;
+      let closedAt: Date | null = null;
+      let lastMessageAt: Date | null = createdAt;
+      let agentId: string | null = null;
 
-  // NEW tickets (10)
-  for (let i = 0; i < 10; i++) {
-    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
-    const intent = intents[Math.floor(Math.random() * intents.length)];
-    const daysOld = Math.floor(Math.random() * 5);
+      if (dist.hasAgent) {
+        agentId = operators[Math.floor(Math.random() * operators.length)].id;
+        // Назначение сразу, через 0-2 минуты
+        assignedAt = new Date(createdAt.getTime() + randInt(0, 2) * 60 * 1000);
+        // Первый ответ: от 1 до 12 минут (но для эскалации может быть чуть дольше, до 20)
+        const replyDelay = isEscalated ? randInt(2, 20) : randInt(1, 10);
+        firstReplyAt = new Date(assignedAt.getTime() + replyDelay * 60 * 1000);
+      }
+      if (dist.hasResolution) {
+        const resolveDelay = isEscalated ? randInt(30, 90) : randInt(5, 35); // минуты
+        resolvedAt = new Date(
+          (firstReplyAt || assignedAt || createdAt).getTime() +
+            resolveDelay * 60 * 1000,
+        );
+        lastMessageAt = resolvedAt;
+      }
+      if (dist.hasClose) {
+        closedAt = new Date(
+          (resolvedAt || createdAt).getTime() + randInt(2, 20) * 60 * 1000,
+        );
+        lastMessageAt = closedAt;
+      }
 
-    const ticket = await prisma.ticket.create({
-      data: {
-        id: uuidv4(),
-        applicantId: applicant.id,
-        agentId: null,
-        status: TicketStatus.NEW,
-        priority: Math.floor(Math.random() * 10) + 1,
-        intent,
-        noteText: supportTexts[intent],
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        updatedAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        lastMessageAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-      },
-    });
+      const ticket = await prisma.ticket.create({
+        data: {
+          id: uuidv4(),
+          applicantId: applicant.id,
+          agentId,
+          status: dist.status,
+          priority: isEscalated ? randInt(8, 10) : randInt(1, 7),
+          intent,
+          noteText:
+            isEscalated && Math.random() < 0.7
+              ? complexIssues[Math.floor(Math.random() * complexIssues.length)]
+              : supportTexts[intent],
+          assignedAt,
+          firstReplyAt,
+          resolvedAt,
+          closedAt,
+          createdAt,
+          updatedAt: lastMessageAt,
+          lastMessageAt,
+          satisfactionScore:
+            dist.status === TicketStatus.RESOLVED ||
+            dist.status === TicketStatus.CLOSED
+              ? isEscalated
+                ? [SatisfactionScore.GOOD, SatisfactionScore.EXCELLENT][
+                    randInt(0, 1)
+                  ]
+                : [
+                    SatisfactionScore.GOOD,
+                    SatisfactionScore.EXCELLENT,
+                    SatisfactionScore.EXCELLENT,
+                  ][randInt(0, 2)]
+              : undefined,
+        },
+      });
 
-    // First message from applicant
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: applicant.id,
-        authorType: 'FROM_CUSTOMER',
-        content: supportTexts[intent],
-        status: 'SENT',
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-      },
-    });
-
-    ticketCounter++;
-  }
-  console.log(`🆕 Created ${ticketCounter} NEW tickets`);
-
-  // IN_PROGRESS tickets (15)
-  let inProgressCount = 0;
-  for (let i = 0; i < 15; i++) {
-    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
-    const operator = operators[Math.floor(Math.random() * operators.length)];
-    const intent = intents[Math.floor(Math.random() * intents.length)];
-    const daysOld = Math.floor(Math.random() * 7) + 1;
-
-    const ticket = await prisma.ticket.create({
-      data: {
-        id: uuidv4(),
-        applicantId: applicant.id,
-        agentId: operator.id,
-        status: TicketStatus.IN_PROGRESS,
-        priority: Math.floor(Math.random() * 10) + 1,
-        intent,
-        noteText: supportTexts[intent],
-        assignedAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        updatedAt: daysAgo(0, Math.floor(Math.random() * 24)),
-        lastMessageAt: daysAgo(0, Math.floor(Math.random() * 24)),
-      },
-    });
-
-    // First message from applicant
-    const applicantMsgTime = daysAgo(daysOld, Math.floor(Math.random() * 24));
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: applicant.id,
-        authorType: 'FROM_CUSTOMER',
-        content: supportTexts[intent],
-        status: 'SENT',
-        createdAt: applicantMsgTime,
-      },
-    });
-
-    // Agent response
-    const agentMsgTime = daysAgo(daysOld - 1, Math.floor(Math.random() * 20));
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: operator.id,
-        authorType: 'FROM_AGENT',
-        content:
-          agentResponses[Math.floor(Math.random() * agentResponses.length)],
-        status: 'DELIVERED',
-        deliveredAt: agentMsgTime,
-        createdAt: agentMsgTime,
-      },
-    });
-
-    // Possible follow-up messages
-    if (Math.random() < 0.6) {
-      const followupTime = daysAgo(
-        Math.floor(Math.random() * (daysOld - 1)),
-        Math.floor(Math.random() * 24),
-      );
+      // Сообщение от абитуриента
+      const customerMsgContent =
+        isEscalated && Math.random() < 0.8
+          ? complexIssues[Math.floor(Math.random() * complexIssues.length)]
+          : supportTexts[intent];
       await prisma.ticketMessage.create({
         data: {
           ticketId: ticket.id,
           authorId: applicant.id,
           authorType: 'FROM_CUSTOMER',
-          content: 'Спасибо за информацию!',
+          content: customerMsgContent,
           status: 'SENT',
-          createdAt: followupTime,
+          createdAt: new Date(createdAt.getTime() + randInt(0, 5) * 60 * 1000),
         },
       });
+
+      // Ответ агента, если есть
+      if (agentId && firstReplyAt) {
+        const responseText = isEscalated
+          ? 'Здравствуйте! Ваш вопрос требует дополнительной проверки. Я передал его старшему специалисту. Ожидайте ответ в течение часа. Спасибо за понимание.'
+          : fastAgentResponses[randInt(0, fastAgentResponses.length - 1)] +
+            ' ' +
+            (Math.random() > 0.5
+              ? 'Вы можете отслеживать статус в личном кабинете.'
+              : 'Если остались вопросы, пишите.');
+        await prisma.ticketMessage.create({
+          data: {
+            ticketId: ticket.id,
+            authorId: agentId,
+            authorType: 'FROM_AGENT',
+            content: responseText,
+            status: 'DELIVERED',
+            deliveredAt: firstReplyAt,
+            seenAt: firstReplyAt,
+            createdAt: firstReplyAt,
+          },
+        });
+      }
+
+      // Если эскалация, добавим запись в EscalationTicketAudit
+      if (isEscalated && agentId) {
+        const supervisorId = supervisor.id;
+        await prisma.escalationTicketAudit.create({
+          data: {
+            ticketId: ticket.id,
+            fromAgentId: agentId,
+            toAgentId: supervisorId,
+            cause: 'COMPLEX_ISSUE',
+            causeComment:
+              'Требуется дополнительная проверка документов или взаимодействие с другими отделами',
+            escalatedAt:
+              firstReplyAt || new Date(createdAt.getTime() + 5 * 60 * 1000),
+            acceptedAt: new Date(
+              (firstReplyAt || createdAt).getTime() +
+                randInt(5, 30) * 60 * 1000,
+            ),
+          },
+        });
+      }
+
+      totalTickets++;
     }
-
-    inProgressCount++;
+    console.log(
+      `  ✅ Created ${dist.count} ${dist.status} tickets (positive SLA)`,
+    );
   }
-  console.log(`🔄 Created ${inProgressCount} IN_PROGRESS tickets`);
+  console.log(`🎫 Total tickets created: ${totalTickets}`);
 
-  // RESOLVED tickets (12)
-  let resolvedCount = 0;
-  for (let i = 0; i < 12; i++) {
-    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
-    const operator = operators[Math.floor(Math.random() * operators.length)];
-    const intent = intents[Math.floor(Math.random() * intents.length)];
-    const daysOld = Math.floor(Math.random() * 15) + 3;
-
-    const ticket = await prisma.ticket.create({
-      data: {
-        id: uuidv4(),
-        applicantId: applicant.id,
-        agentId: operator.id,
-        status: TicketStatus.RESOLVED,
-        priority: Math.floor(Math.random() * 10) + 1,
-        intent,
-        noteText: supportTexts[intent],
-        satisfactionScore: [
-          SatisfactionScore.EXCELLENT,
-          SatisfactionScore.GOOD,
-          SatisfactionScore.AVERAGE,
-        ][Math.floor(Math.random() * 3)],
-        assignedAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        resolvedAt: daysAgo(
-          daysOld - Math.floor(Math.random() * 3),
-          Math.floor(Math.random() * 24),
-        ),
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        updatedAt: daysAgo(
-          daysOld - Math.floor(Math.random() * 3),
-          Math.floor(Math.random() * 24),
-        ),
-        lastMessageAt: daysAgo(
-          daysOld - Math.floor(Math.random() * 3),
-          Math.floor(Math.random() * 24),
-        ),
-      },
-    });
-
-    // Message from applicant
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: applicant.id,
-        authorType: 'FROM_CUSTOMER',
-        content: supportTexts[intent],
-        status: 'SENT',
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-      },
-    });
-
-    // Agent response
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: operator.id,
-        authorType: 'FROM_AGENT',
-        content:
-          agentResponses[Math.floor(Math.random() * agentResponses.length)],
-        status: 'SEEN',
-        deliveredAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        seenAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        createdAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-      },
-    });
-
-    resolvedCount++;
-  }
-  console.log(`✅ Created ${resolvedCount} RESOLVED tickets`);
-
-  // CLOSED tickets (8)
-  let closedCount = 0;
-  for (let i = 0; i < 8; i++) {
-    const applicant = applicants[Math.floor(Math.random() * applicants.length)];
-    const operator = operators[Math.floor(Math.random() * operators.length)];
-    const intent = intents[Math.floor(Math.random() * intents.length)];
-    const daysOld = Math.floor(Math.random() * 20) + 5;
-
-    const ticket = await prisma.ticket.create({
-      data: {
-        id: uuidv4(),
-        applicantId: applicant.id,
-        agentId: operator.id,
-        status: TicketStatus.CLOSED,
-        priority: Math.floor(Math.random() * 10) + 1,
-        intent,
-        noteText: supportTexts[intent],
-        satisfactionScore: [
-          SatisfactionScore.EXCELLENT,
-          SatisfactionScore.GOOD,
-        ][Math.floor(Math.random() * 2)],
-        assignedAt: daysAgo(daysOld - 2, Math.floor(Math.random() * 20)),
-        resolvedAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        closedAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        updatedAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-        lastMessageAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-      },
-    });
-
-    // Message from applicant
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: applicant.id,
-        authorType: 'FROM_CUSTOMER',
-        content: supportTexts[intent],
-        status: 'SENT',
-        createdAt: daysAgo(daysOld, Math.floor(Math.random() * 24)),
-      },
-    });
-
-    // Agent response
-    await prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        authorId: operator.id,
-        authorType: 'FROM_AGENT',
-        content:
-          agentResponses[Math.floor(Math.random() * agentResponses.length)],
-        status: 'SEEN',
-        deliveredAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        seenAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-        createdAt: daysAgo(daysOld - 1, Math.floor(Math.random() * 20)),
-      },
-    });
-
-    closedCount++;
-  }
-  console.log(`🔒 Created ${closedCount} CLOSED tickets`);
-
-  // ========== Create Dynamic Variables ==========
-
-  const dynamicVariablesData = [
+  // ========== 4. Динамические переменные (только три: фио, фи, почта) ==========
+  const dynamicVariables = [
     {
       name: 'фио',
-      description: 'Полное имя абитуриента (Фамилия Имя Отчество)',
+      description: 'Полное ФИО абитуриента',
       sourceField: 'account.fullName',
       fallbackText: 'Уважаемый абитуриент',
       isSystem: true,
     },
     {
-      name: 'имя',
-      description: 'Имя абитуриента',
-      sourceField: 'account.firstName',
+      name: 'фи',
+      description: 'Фамилия и имя абитуриента',
+      sourceField: 'account.firstName', // источник будет комбинироваться через шаблон, но для простоты храним firstName
       fallbackText: 'Абитуриент',
       isSystem: true,
     },
     {
-      name: 'фамилия',
-      description: 'Фамилия абитуриента',
-      sourceField: 'account.lastName',
-      fallbackText: '—',
-      isSystem: true,
-    },
-    {
-      name: 'отчество',
-      description: 'Отчество абитуриента',
-      sourceField: 'account.middleName',
-      fallbackText: '—',
-      isSystem: true,
-    },
-    {
-      name: 'email',
+      name: 'почта',
       description: 'Email абитуриента',
       sourceField: 'account.email',
-      fallbackText: '—',
-      isSystem: true,
-    },
-    {
-      name: 'снилс',
-      description: 'СНИЛС абитуриента',
-      sourceField: 'applicant.snils',
-      fallbackText: 'не указан',
-      isSystem: true,
-    },
-    {
-      name: 'льгота_бви',
-      description: 'Право на поступление без вступительных испытаний',
-      sourceField: 'applicant.hasBvi',
-      fallbackText: 'нет',
-      isSystem: true,
-    },
-    {
-      name: 'льгота_особая',
-      description: 'Особая квота',
-      sourceField: 'applicant.hasSpecialQuota',
-      fallbackText: 'нет',
-      isSystem: true,
-    },
-    {
-      name: 'льгота_отдельная',
-      description: 'Отдельная квота',
-      sourceField: 'applicant.hasSeparateQuota',
-      fallbackText: 'нет',
-      isSystem: true,
-    },
-    {
-      name: 'льгота_целевая',
-      description: 'Целевая квота',
-      sourceField: 'applicant.hasTargetQuota',
-      fallbackText: 'нет',
-      isSystem: true,
-    },
-    {
-      name: 'преимущественное_право',
-      description: 'Преимущественное право зачисления',
-      sourceField: 'applicant.hasPriorityRight',
-      fallbackText: 'нет',
-      isSystem: true,
-    },
-    {
-      name: 'оригинал_сдан',
-      description: 'Оригинал аттестата сдан',
-      sourceField: 'applicant.originalDocumentReceived',
-      fallbackText: 'нет',
-      isSystem: true,
-    },
-    {
-      name: 'оригинал_дата',
-      description: 'Дата сдачи оригинала аттестата',
-      sourceField: 'applicant.originalDocumentReceivedAt',
-      fallbackText: 'не указана',
-      isSystem: true,
-    },
-    {
-      name: 'направление_1',
-      description: 'Код программы первого приоритета',
-      sourceField: 'applicant.programs.first.programCode',
-      fallbackText: 'не выбрано',
-      isSystem: true,
-    },
-    {
-      name: 'форма_1',
-      description: 'Форма обучения первого приоритета',
-      sourceField: 'applicant.programs.first.studyForm',
-      fallbackText: 'не указана',
-      isSystem: true,
-    },
-    {
-      name: 'основание_1',
-      description: 'Основание поступления первого приоритета',
-      sourceField: 'applicant.programs.first.admissionType',
-      fallbackText: 'не указано',
-      isSystem: true,
-    },
-    {
-      name: 'направление_2',
-      description: 'Код программы второго приоритета',
-      sourceField: 'applicant.programs.second.programCode',
-      fallbackText: 'не выбрано',
-      isSystem: true,
-    },
-    {
-      name: 'форма_2',
-      description: 'Форма обучения второго приоритета',
-      sourceField: 'applicant.programs.second.studyForm',
-      fallbackText: 'не указана',
-      isSystem: true,
-    },
-    {
-      name: 'количество_программ',
-      description: 'Количество выбранных программ',
-      sourceField: 'applicant.programs.count',
-      fallbackText: '0',
-      isSystem: true,
-    },
-    {
-      name: 'балл_русский',
-      description: 'Балл ЕГЭ по русскому языку',
-      sourceField: 'applicant.exams.Русский язык.score',
-      fallbackText: 'нет данных',
-      isSystem: true,
-    },
-    {
-      name: 'балл_математика',
-      description: 'Балл ЕГЭ по математике',
-      sourceField: 'applicant.exams.Математика.score',
-      fallbackText: 'нет данных',
-      isSystem: true,
-    },
-    {
-      name: 'балл_физика',
-      description: 'Балл ЕГЭ/ВИ по физике',
-      sourceField: 'applicant.exams.Физика.score',
-      fallbackText: 'нет данных',
-      isSystem: true,
-    },
-    {
-      name: 'балл_информатика',
-      description: 'Балл ЕГЭ/ВИ по информатике',
-      sourceField: 'applicant.exams.Информатика и ИКТ.score',
-      fallbackText: 'нет данных',
-      isSystem: true,
-    },
-    {
-      name: 'балл_общество',
-      description: 'Балл ЕГЭ по обществознанию',
-      sourceField: 'applicant.exams.Обществознание.score',
-      fallbackText: 'нет данных',
+      fallbackText: 'email не указан',
       isSystem: true,
     },
   ];
+  await prisma.dynamicVariable.createMany({ data: dynamicVariables });
+  console.log(
+    `📝 Created ${dynamicVariables.length} dynamic variables (фио, фи, почта)`,
+  );
 
-  await prisma.dynamicVariable.createMany({
-    data: dynamicVariablesData,
-  });
+  // ========== 5. Шаблоны с переменными и примерами (вуз, адрес, бухгалтерия) ==========
+  const templatesData = [
+    {
+      alias: 'welcome_general',
+      title: 'Приветствие с информацией о вузе',
+      category: AdmissionIntentCategory.GENERAL_INFO,
+      content: {
+        text: `Здравствуйте, {{фио}}! Вы обратились в **МГТУ «СТАНКИН»** (Московский государственный технологический университет «СТАНКИН»). Наш адрес: **Вадковский пер., 1, Москва, 127055**. Рады видеть вас среди абитуриентов!`,
+      },
+      isActive: true,
+      createdBy: admin.id,
+    },
+    {
+      alias: 'payment_contacts',
+      title: 'Контакты бухгалтерии',
+      category: AdmissionIntentCategory.PAYMENTS_CONTRACTS,
+      content: {
+        text: `{{фио}}, по вопросам оплаты обучения обращайтесь в финансовый отдел МГТУ «СТАНКИН». Контакты: **Иванова Екатерина Дмитриевна**, главный бухгалтер. Телефон: **+7 (495) 123-45-67** (доб. 112). Время работы: пн–чт 09:00–18:00, пт 09:00–16:45, перерыв 13:00–13:45. Email: buh@stankin.ru.`,
+      },
+      isActive: true,
+      createdBy: admin.id,
+    },
+    {
+      alias: 'dormitory_info',
+      title: 'Информация об общежитии',
+      category: AdmissionIntentCategory.DORMITORY_HOUSING,
+      content: {
+        text: `Уважаемый {{фио}}, общежитие МГТУ «СТАНКИН» находится по адресу: ул. Прянишникова, 2А. Для заселения необходимо предоставить справку о состоянии здоровья и копию паспорта.`,
+      },
+      isActive: true,
+      createdBy: admin.id,
+    },
+    {
+      alias: 'exam_schedule',
+      title: 'Расписание вступительных испытаний',
+      category: AdmissionIntentCategory.STUDIES_SCHEDULE,
+      content: {
+        text: `{{фи}}, расписание экзаменов опубликовано на сайте → stankin.ru/abiturient. Ваши баллы: русский – {{балл_русский}}, математика – {{балл_математика}}.`,
+      },
+      isActive: true,
+      createdBy: admin.id,
+    },
+  ];
+  await prisma.template.createMany({ data: templatesData });
+  console.log(
+    `📄 Created ${templatesData.length} templates with variables and custom examples`,
+  );
 
-  console.log(`📝 Created ${dynamicVariablesData.length} dynamic variables`);
-
-  // ========== Integrations & Test Notifications ==========
-
-  const integrationFailure = await prisma.integration.create({
+  // ========== 6. Интеграции и уведомления (без Telegram, только обновление списков и сбой оплаты) ==========
+  const integrationListUpdate = await prisma.integration.create({
     data: {
-      slug: 'telegram-failure-alert',
-      name: 'Telegram: Сбои системы',
-      eventType: 'FAILURE',
-      theme: 'dark',
-      source: 'https://api.telegram.org/bot123/sendMessage',
-      content: { text: 'Критический сбой системы', chatId: '-100123456' },
+      slug: 'list-update-event',
+      name: 'Внешнее событие: обновление списков поступающих',
+      eventType: 'INFORMATIONAL',
+      theme: 'light',
+      source: 'https://api.stankin.ru/webhook/list-update',
+      content: {
+        message: 'Списки поступающих обновлены. Проверьте свои позиции.',
+        channel: 'internal',
+      },
       isTypeEditable: false,
-      isThemeEditable: false,
+      isThemeEditable: true,
       isSourceEditable: false,
       isContentEditable: true,
       createdBy: admin.id,
     },
   });
 
-  const integrationInfo = await prisma.integration.create({
+  const integrationPaymentFailure = await prisma.integration.create({
     data: {
-      slug: 'general-info-notification',
-      name: 'Общие уведомления',
-      eventType: 'INFORMATIONAL',
-      theme: 'light',
-      source: 'https://api.telegram.org/bot456/sendMessage',
-      content: { text: 'Информационное сообщение', chatId: '-100654321' },
+      slug: 'payment-failure-alert',
+      name: 'Сбой оплаты при заключении договора',
+      eventType: 'FAILURE',
+      theme: 'dark',
+      source: 'https://api.stankin.ru/webhook/payment-failure',
+      content: {
+        alert: 'Не удалось провести оплату. Ошибка шлюза.',
+        severity: 'high',
+      },
       isTypeEditable: false,
-      isThemeEditable: true,
+      isThemeEditable: false,
       isSourceEditable: false,
       isContentEditable: true,
       createdBy: admin.id,
@@ -794,71 +906,106 @@ async function main() {
   await prisma.notification.createMany({
     data: [
       {
-        integrationId: integrationFailure.id,
-        payload: { eventType: 'FAILURE', theme: 'dark', source: integrationFailure.source, content: { text: 'БД недоступна — ошибка соединения', chatId: '-100123456' } },
+        integrationId: integrationListUpdate.id,
+        payload: {
+          eventType: 'INFORMATIONAL',
+          message:
+            'Списки рекомендованных к зачислению на бюджет обновлены 05.05.2026 в 15:00',
+          timestamp: new Date().toISOString(),
+        },
         status: 'SENT',
-        sentAt: new Date(Date.now() - 1000 * 60 * 30),
+        sentAt: new Date(),
       },
       {
-        integrationId: integrationFailure.id,
-        payload: { eventType: 'FAILURE', theme: 'dark', source: integrationFailure.source, content: { text: 'Сервис аутентификации не отвечает', chatId: '-100123456' } },
+        integrationId: integrationListUpdate.id,
+        payload: {
+          eventType: 'INFORMATIONAL',
+          message:
+            'Дополнительный список поступающих по целевой квоте опубликован',
+        },
+        status: 'PENDING',
+      },
+      {
+        integrationId: integrationPaymentFailure.id,
+        payload: {
+          eventType: 'FAILURE',
+          error: 'Таймаут соединения с платежным шлюзом',
+          orderId: 'ORDER-12345',
+        },
         status: 'FAILED',
-        error: 'Telegram API returned 429 Too Many Requests',
+        error: 'Payment gateway timeout after 30s',
       },
       {
-        integrationId: integrationFailure.id,
-        payload: { eventType: 'FAILURE', theme: 'dark', source: integrationFailure.source, content: { text: 'Превышен лимит запросов к внешнему API', chatId: '-100123456' } },
-        status: 'PENDING',
-      },
-      {
-        integrationId: integrationInfo.id,
-        payload: { eventType: 'INFORMATIONAL', theme: 'light', source: integrationInfo.source, content: { text: 'Плановое обслуживание 25 апреля с 02:00 до 04:00', chatId: '-100654321' } },
+        integrationId: integrationPaymentFailure.id,
+        payload: {
+          eventType: 'FAILURE',
+          error: 'Неверный формат ответа от банка',
+          retryCount: 3,
+        },
         status: 'SENT',
-        sentAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      },
-      {
-        integrationId: integrationInfo.id,
-        payload: { eventType: 'INFORMATIONAL', theme: 'light', source: integrationInfo.source, content: { text: 'Новая версия системы успешно развёрнута', chatId: '-100654321' } },
-        status: 'PENDING',
+        sentAt: new Date(Date.now() - 1000 * 60 * 120),
       },
     ],
   });
 
-  console.log('🔗 Created 2 integrations with 5 test notifications');
+  console.log(
+    '🔗 Created 2 integrations (list-update, payment-failure) with notifications (no Telegram)',
+  );
 
-  // ========== Final Statistics ==========
-
+  // ========== 7. Итоговая статистика ==========
+  const accountsCount = await prisma.account.count();
   const ticketsCount = await prisma.ticket.count();
   const messagesCount = await prisma.ticketMessage.count();
-  const accountsCount = await prisma.account.count();
   const variablesCount = await prisma.dynamicVariable.count();
+  const templatesCount = await prisma.template.count();
+
+  // Быстрый расчёт среднего времени первого ответа для отладки (можно удалить)
+  const ticketsWithFirstReply = await prisma.ticket.findMany({
+    where: { firstReplyAt: { not: null }, createdAt: { not: null } },
+    select: { createdAt: true, firstReplyAt: true },
+  });
+  let totalMinutes = 0;
+  for (const t of ticketsWithFirstReply) {
+    const diff = (t.firstReplyAt!.getTime() - t.createdAt!.getTime()) / 60000;
+    totalMinutes += diff;
+  }
+  const avgFirstReplyMinutes = ticketsWithFirstReply.length
+    ? (totalMinutes / ticketsWithFirstReply.length).toFixed(1)
+    : 0;
 
   console.log('\n=================================');
   console.log('✅ Seeding completed successfully!');
   console.log('=================================');
-
-  console.log('\n📊 Database statistics:');
+  console.log(`📊 Database statistics:`);
   console.log(`  👥 Accounts: ${accountsCount}`);
-  console.log(`  📋 Tickets: ${ticketsCount}`);
+  console.log(`  🎫 Tickets: ${ticketsCount}`);
   console.log(`  💬 Messages: ${messagesCount}`);
-  console.log(`  📝 Dynamic variables: ${variablesCount}`);
+  console.log(`  📝 Dynamic variables: ${variablesCount} (фио, фи, почта)`);
+  console.log(`  📄 Templates: ${templatesCount}`);
+  console.log(
+    `\n⏱️ Average first reply time: ~${avgFirstReplyMinutes} minutes (target <12 min) ✅`,
+  );
 
   console.log('\n📋 Test accounts:');
   console.log('  👑 Admin:      admin@admin.com / admin');
   console.log('  👔 Supervisor: supervisor@example.com / admin');
-  for (let i = 0; i < operators.length; i++) {
-    console.log(`  👨‍💼 Operator${i + 1}:  operator${i + 1}@example.com / admin`);
-  }
-  for (let i = 0; i < Math.min(5, applicants.length); i++) {
-    console.log(`  📚 Applicant${i + 1}: ${applicantNames[i].email} / user123`);
-  }
+  operators.forEach((op, idx) =>
+    console.log(`  👨‍💼 Operator${idx + 1}:  ${op.email} / admin`),
+  );
+  applicants
+    .slice(0, 5)
+    .forEach((app, idx) =>
+      console.log(`  📚 Applicant${idx + 1}: ${app.email} / user123`),
+    );
 
-  console.log('\n📋 Ticket distribution:');
-  console.log(`  🆕 NEW: ${ticketCounter}`);
-  console.log(`  🔄 IN_PROGRESS: ${inProgressCount}`);
-  console.log(`  ✅ RESOLVED: ${resolvedCount}`);
-  console.log(`  🔒 CLOSED: ${closedCount}`);
-  console.log(`  ⚠️ ESCALATED: 0`);
+  console.log('\n📊 Ticket distribution (positive SLA):');
+  const statusCounts = await prisma.ticket.groupBy({
+    by: ['status'],
+    _count: true,
+  });
+  for (const sc of statusCounts) {
+    console.log(`  ${sc.status}: ${sc._count}`);
+  }
   console.log('=================================\n');
 }
 

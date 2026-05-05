@@ -4,56 +4,56 @@ import { TicketListResponseDto } from './ticket-list-response.dto';
 
 export class ExamScoreDto {
   @ApiProperty({ example: 'Mathematics' })
-  subjectName: string;
+  subjectName!: string;
 
   @ApiProperty({ example: '09.03.03', required: false })
   subjectCode?: string;
 
   @ApiProperty({ example: 95 })
-  score: number;
+  score!: number;
 
   @ApiProperty({ enum: ['EGE', 'INTERNAL'], example: 'EGE' })
-  type: string;
+  type!: string;
 }
 
 export class ApplicantProgramDto {
   @ApiProperty({ example: 12345 })
-  programId: number;
+  programId!: number;
 
   @ApiProperty({ example: '01.03.02' })
-  programCode: string;
+  programCode!: string;
 
   @ApiProperty({ example: 'Software Engineering' })
-  programName: string;
+  programName!: string;
 
   @ApiProperty({ enum: ['FULL_TIME', 'PART_TIME'], example: 'FULL_TIME' })
-  studyForm: string;
+  studyForm!: string;
 
   @ApiProperty({
     enum: ['BUDGET_COMPETITIVE', 'PAID'],
     example: 'BUDGET_COMPETITIVE',
   })
-  admissionType: string;
+  admissionType!: string;
 
   @ApiProperty({ example: 1 })
-  priority: number;
+  priority!: number;
 }
 
 export class TicketDetailResponseDto extends TicketListResponseDto {
   @ApiProperty({ example: 'User has issues with document submission' })
-  noteText: string;
+  noteText!: string;
 
   @ApiProperty({
     enum: AdmissionIntentCategory,
     example: 'DOCUMENT_SUBMISSION',
   })
-  intent: AdmissionIntentCategory;
+  intent!: AdmissionIntentCategory;
 
   @ApiProperty({ type: [ExamScoreDto] })
-  examScores: ExamScoreDto[];
+  examScores!: ExamScoreDto[];
 
   @ApiProperty({ type: [ApplicantProgramDto] })
-  applicantPrograms: ApplicantProgramDto[];
+  applicantPrograms!: ApplicantProgramDto[];
 
   @ApiProperty({ example: '12345678901', required: false })
   applicantSnils?: string;
@@ -89,5 +89,5 @@ export class TicketDetailResponseDto extends TicketListResponseDto {
   closedAt?: string;
 
   @ApiProperty({ example: '2024-01-15T10:35:00Z' })
-  updatedAt: string;
+  updatedAt!: string;
 }
