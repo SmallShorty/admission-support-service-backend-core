@@ -34,6 +34,8 @@ import {
   TicketDetailResponseDto,
   TicketCountsResponseDto,
   VariableResolvedDto,
+  AddTicketCommentDto,
+  UpdateTicketCategoryDto,
 } from 'src/application/dto/tickets/index';
 import { GetTicketVariablesUseCase } from 'src/application/use-cases/tickets/get-ticket-variables.usecase';
 import { AuditLogService } from 'src/infrastructure/prisma/audit-log.service';
@@ -538,6 +540,51 @@ export class TicketController {
     } catch {}
 
     return ticket;
+  }
+
+  @Patch(':id/category')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update ticket category',
+    description: 'Changes the category (intent) of a ticket. Allowed for the assigned agent, ADMIN, and SUPERVISOR.',
+  })
+  @ApiParam({ name: 'id', description: 'Ticket ID', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiResponse({ status: 200, description: 'Category updated', type: TicketListResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid category value' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Not assigned to this ticket' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  async updateTicketCategory(
+    @Param('id') ticketId: string,
+    @Req() req,
+    @Body() body: UpdateTicketCategoryDto,
+  ) {
+    const accountId = req.user.id;
+    const accountRole = req.user.role;
+    return this.ticketService.updateTicketCategory(ticketId, accountId, accountRole, body.category);
+  }
+
+  @Patch(':id/comment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Add or update internal comment on a ticket',
+    description: 'Saves an internal agent note (noteText) on the ticket. Visible only to agents, not to the applicant.',
+  })
+  @ApiParam({ name: 'id', description: 'Ticket ID', example: '123e4567-e89b-12d3-a456-426614174000' })
+  @ApiResponse({
+    status: 200,
+    description: 'Comment saved',
+    schema: { example: { noteText: 'Applicant confirmed documents were submitted' } },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Ticket not found' })
+  async addComment(
+    @Param('id') ticketId: string,
+    @Req() req,
+    @Body() body: AddTicketCommentDto,
+  ) {
+    const accountId = req.user.id;
+    return this.ticketService.addComment(ticketId, accountId, body.text);
   }
 
   @Get(':id/variables')

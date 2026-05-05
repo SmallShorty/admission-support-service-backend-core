@@ -15,6 +15,7 @@ import {
   AuditAction,
   AuditCategory,
   LogSeverity,
+  AdmissionIntentCategory,
 } from 'generated/prisma/enums';
 import { Prisma } from 'generated/prisma/client';
 
@@ -943,6 +944,63 @@ export class TicketService {
         previousStatus,
       };
     });
+  }
+
+  async updateTicketCategory(
+    ticketId: string,
+    accountId: string,
+    accountRole: AccountRole,
+    category: AdmissionIntentCategory,
+  ) {
+    this.logger.log(`Updating ticket ${ticketId} category to ${category}`);
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { applicant: { select: this.applicantSelectFields } },
+    });
+
+    if (!ticket) {
+      throw new TicketNotFoundException(ticketId);
+    }
+
+    const isAssignedAgent = ticket.agentId === accountId;
+    const isAdminOrSupervisor =
+      accountRole === AccountRole.ADMIN ||
+      accountRole === AccountRole.SUPERVISOR;
+
+    if (!isAssignedAgent && !isAdminOrSupervisor) {
+      throw new UnauthorizedTicketAccessException(
+        `Agent ${accountId} is not assigned to ticket ${ticketId}`,
+      );
+    }
+
+    const updated = await this.prisma.ticket.update({
+      where: { id: ticketId },
+      data: { intent: category, updatedAt: new Date() },
+      include: { applicant: { select: this.applicantSelectFields } },
+    });
+
+    return this.toTicketListResponse(updated);
+  }
+
+  async addComment(ticketId: string, accountId: string, text: string) {
+    this.logger.log(`Adding comment to ticket ${ticketId} by ${accountId}`);
+
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) {
+      throw new TicketNotFoundException(ticketId);
+    }
+
+    const updated = await this.prisma.ticket.update({
+      where: { id: ticketId },
+      data: { noteText: text, updatedAt: new Date() },
+      include: { applicant: { select: this.applicantSelectFields } },
+    });
+
+    return { noteText: updated.noteText };
   }
 
   async updateTicketStatus(
