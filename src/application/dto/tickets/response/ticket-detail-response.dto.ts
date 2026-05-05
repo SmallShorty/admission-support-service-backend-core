@@ -6,6 +6,9 @@ export class ExamScoreDto {
   @ApiProperty({ example: 'Mathematics' })
   subjectName: string;
 
+  @ApiProperty({ example: '09.03.03', required: false })
+  subjectCode?: string;
+
   @ApiProperty({ example: 95 })
   score: number;
 

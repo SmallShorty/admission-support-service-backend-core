@@ -103,6 +103,7 @@ export interface TicketDetailResponse extends TicketListResponse {
   updatedAt: string;
   examScores?: Array<{
     subjectName: string;
+    subjectCode?: string | null;
     score: number;
     type: string | null;
   }>;
@@ -378,7 +379,7 @@ export class TicketService {
       return result;
     } catch (error) {
       this.logger.error(
-        `Failed to save message for ticket ${data.ticketId}: ${error.message}`,
+        `Failed to save message for ticket ${data.ticketId}: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
     }
@@ -753,6 +754,7 @@ export class TicketService {
       updatedAt: ticket.updatedAt?.toISOString() || new Date().toISOString(),
       examScores: applicantData?.examScores?.map((score: any) => ({
         subjectName: score.subjectName,
+        subjectCode: score.subjectCode,
         score: score.score,
         type: score.type,
       })),

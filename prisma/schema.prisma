@@ -95,6 +95,7 @@ model ExamScore {
   id          BigInt    @id @default(autoincrement())
   applicantId String    @map("applicant_id") @db.Uuid
   subjectName String    @map("subject_name") @db.VarChar(100)
+  subjectCode String?   @map("subject_code") @db.VarChar(20)
   score       Int
   type        ExamType?
 
