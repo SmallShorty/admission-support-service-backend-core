@@ -8,6 +8,7 @@ import { NotificationDto } from 'src/application/dto/notifications/response/noti
 import { IntegrationService } from 'src/infrastructure/prisma/integrations.service';
 import { NotificationService } from 'src/infrastructure/prisma/notifications.service';
 import { IntegrationLogService } from 'src/infrastructure/prisma/integration-log.service';
+import { TicketChatGateway } from 'src/infrastructure/gateways/chat/ticket.gateway';
 import { IntegrationAction, LogSeverity } from 'generated/prisma/enums';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class SubmitIntegrationUseCase {
     private readonly integrationService: IntegrationService,
     private readonly notificationService: NotificationService,
     private readonly integrationLogService: IntegrationLogService,
+    private readonly ticketChatGateway: TicketChatGateway,
   ) {}
 
   async execute(
@@ -97,6 +99,8 @@ export class SubmitIntegrationUseCase {
     };
 
     const notification = await this.notificationService.create(integration.id, payload);
+
+    this.ticketChatGateway.emitNewIntegrationNotification(notification, integration.name);
 
     try {
       await this.integrationLogService.log({

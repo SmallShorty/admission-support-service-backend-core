@@ -7,14 +7,34 @@ import { Prisma } from 'generated/prisma/client';
 import { IntegrationEventType } from 'generated/prisma/enums';
 import { CreateIntegrationDto } from 'src/application/dto/integrations/request/create-integration.dto';
 import { UpdateIntegrationDto } from 'src/application/dto/integrations/request/update-integration.dto';
-import { IntegrationDto } from 'src/application/dto/integrations/response/integration.dto';
+import {
+  IntegrationAuthorDto,
+  IntegrationDto,
+} from 'src/application/dto/integrations/response/integration.dto';
 import { PrismaService } from './prisma.service';
+
+type IntegrationWithCreator = Prisma.IntegrationGetPayload<{
+  include: { creator: true };
+}>;
+
+function toDto(integration: IntegrationWithCreator): IntegrationDto {
+  const { creator, createdBy, ...rest } = integration;
+  const author: IntegrationAuthorDto = {
+    id: creator.id,
+    firstName: creator.firstName,
+    lastName: creator.lastName,
+    middleName: creator.middleName ?? null,
+  };
+  return { ...rest, author };
+}
+
+const include = { creator: true } satisfies Prisma.IntegrationInclude;
 
 @Injectable()
 export class IntegrationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: CreateIntegrationDto): Promise<IntegrationDto> {
+  async create(data: CreateIntegrationDto & { createdBy: string }): Promise<IntegrationDto> {
     const existing = await this.prisma.integration.findUnique({
       where: { slug: data.slug },
     });
@@ -25,7 +45,7 @@ export class IntegrationService {
       );
     }
 
-    return this.prisma.integration.create({ data });
+    return toDto(await this.prisma.integration.create({ data, include }));
   }
 
   async findPaginated(params: {
@@ -60,6 +80,7 @@ export class IntegrationService {
     const [items, total] = await Promise.all([
       this.prisma.integration.findMany({
         where,
+        include,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -67,31 +88,33 @@ export class IntegrationService {
       this.prisma.integration.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map(toDto), total };
   }
 
   async findById(id: string): Promise<IntegrationDto> {
     const integration = await this.prisma.integration.findUnique({
       where: { id },
+      include,
     });
 
     if (!integration) {
       throw new NotFoundException(`Integration with ID ${id} not found`);
     }
 
-    return integration;
+    return toDto(integration);
   }
 
   async findBySlug(slug: string): Promise<IntegrationDto> {
     const integration = await this.prisma.integration.findUnique({
       where: { slug },
+      include,
     });
 
     if (!integration) {
       throw new NotFoundException(`Integration with slug "${slug}" not found`);
     }
 
-    return integration;
+    return toDto(integration);
   }
 
   async update(
@@ -111,10 +134,9 @@ export class IntegrationService {
     }
 
     try {
-      return await this.prisma.integration.update({
-        where: { id },
-        data,
-      });
+      return toDto(
+        await this.prisma.integration.update({ where: { id }, data, include }),
+      );
     } catch {
       throw new NotFoundException(`Integration with ID ${id} not found`);
     }
@@ -122,10 +144,13 @@ export class IntegrationService {
 
   async activate(id: string): Promise<IntegrationDto> {
     try {
-      return await this.prisma.integration.update({
-        where: { id },
-        data: { isActive: true },
-      });
+      return toDto(
+        await this.prisma.integration.update({
+          where: { id },
+          data: { isActive: true },
+          include,
+        }),
+      );
     } catch {
       throw new NotFoundException(`Integration with ID ${id} not found`);
     }
@@ -133,10 +158,13 @@ export class IntegrationService {
 
   async deactivate(id: string): Promise<IntegrationDto> {
     try {
-      return await this.prisma.integration.update({
-        where: { id },
-        data: { isActive: false },
-      });
+      return toDto(
+        await this.prisma.integration.update({
+          where: { id },
+          data: { isActive: false },
+          include,
+        }),
+      );
     } catch {
       throw new NotFoundException(`Integration with ID ${id} not found`);
     }

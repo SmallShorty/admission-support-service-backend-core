@@ -36,6 +36,7 @@ model Account {
   ticketsAsApplicant  Ticket[]                @relation("tickets_applicant")
   userConnections     UserConnection[]
   templates           Template[]              @relation("template_creator")
+  integrations        Integration[]           @relation("integration_creator")
 
   @@map("accounts")
 }
@@ -223,13 +224,16 @@ model Integration {
   isSourceEditable  Boolean @default(true) @map("is_source_editable")
   isContentEditable Boolean @default(true) @map("is_content_editable")
 
+  createdBy String   @map("created_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt      @map("updated_at") @db.Timestamp(6)
 
+  creator       Account        @relation("integration_creator", fields: [createdBy], references: [id])
   notifications Notification[]
 
   @@index([name])
   @@index([eventType])
+  @@index([createdBy])
   @@map("integrations")
 }
 

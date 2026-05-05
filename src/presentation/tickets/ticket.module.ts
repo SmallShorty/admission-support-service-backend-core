@@ -31,6 +31,6 @@ import { AuditLogModule } from 'src/presentation/audit-log/audit-log.module';
     ResolveVariablesUseCase,
     GetTicketVariablesUseCase,
   ],
-  exports: [TicketService],
+  exports: [TicketService, TicketChatGateway],
 })
 export class TicketModule {}

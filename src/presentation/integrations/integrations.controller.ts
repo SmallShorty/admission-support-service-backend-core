@@ -23,12 +23,15 @@ import { CreateIntegrationDto } from 'src/application/dto/integrations/request/c
 import { UpdateIntegrationDto } from 'src/application/dto/integrations/request/update-integration.dto';
 import { IntegrationDto } from 'src/application/dto/integrations/response/integration.dto';
 import { IntegrationService } from 'src/infrastructure/prisma/integrations.service';
+import { NotificationService } from 'src/infrastructure/prisma/notifications.service';
 import { AccountService } from 'src/infrastructure/prisma/accounts.service';
 import { IntegrationLogService } from 'src/infrastructure/prisma/integration-log.service';
+import { TicketChatGateway } from 'src/infrastructure/gateways/chat/ticket.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from 'src/shared/decorators/roles.decorator';
 import { PaginatedResponseDto } from 'src/shared/dto/paginated-response.dto';
+import { NotificationDto } from 'src/application/dto/notifications/response/notification.dto';
 
 @ApiTags('Integrations')
 @Controller('integrations')
@@ -37,8 +40,10 @@ import { PaginatedResponseDto } from 'src/shared/dto/paginated-response.dto';
 export class IntegrationsController {
   constructor(
     private readonly integrationService: IntegrationService,
+    private readonly notificationService: NotificationService,
     private readonly accountService: AccountService,
     private readonly integrationLogService: IntegrationLogService,
+    private readonly ticketChatGateway: TicketChatGateway,
   ) {}
 
   @Post()
@@ -49,7 +54,7 @@ export class IntegrationsController {
   @ApiResponse({ status: 201, type: IntegrationDto })
   @ApiResponse({ status: 409, description: 'Slug already exists' })
   async create(@Body() dto: CreateIntegrationDto, @Req() req): Promise<IntegrationDto> {
-    const result = await this.integrationService.create(dto);
+    const result = await this.integrationService.create({ ...dto, createdBy: req.user.id });
 
     try {
       const actor = await this.accountService.account({ id: req.user.id });
@@ -93,6 +98,27 @@ export class IntegrationsController {
   @ApiResponse({ status: 404, description: 'Integration not found' })
   async findBySlug(@Param('slug') slug: string): Promise<IntegrationDto> {
     return this.integrationService.findBySlug(slug);
+  }
+
+  @Post(':id/test')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RolesGuard)
+  @Roles(AccountRole.ADMIN, AccountRole.SUPERVISOR)
+  @ApiOperation({ summary: 'Send a test notification for this integration (emits WS event)' })
+  @ApiResponse({ status: 201, type: NotificationDto })
+  @ApiResponse({ status: 404, description: 'Integration not found' })
+  async sendTestNotification(@Param('id') id: string): Promise<NotificationDto> {
+    const integration = await this.integrationService.findById(id);
+    const payload = {
+      eventType: integration.eventType,
+      theme: integration.theme,
+      source: integration.source,
+      content: integration.content,
+      _test: true,
+    };
+    const notification = await this.notificationService.create(id, payload);
+    this.ticketChatGateway.emitNewIntegrationNotification(notification, integration.name);
+    return notification;
   }
 
   @Patch(':id')

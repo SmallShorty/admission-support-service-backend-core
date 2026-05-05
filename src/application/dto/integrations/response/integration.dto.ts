@@ -1,5 +1,19 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IntegrationEventType } from 'generated/prisma/enums';
+
+export class IntegrationAuthorDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  id: string;
+
+  @ApiProperty({ example: 'Иван' })
+  firstName: string;
+
+  @ApiProperty({ example: 'Иванов' })
+  lastName: string;
+
+  @ApiPropertyOptional({ example: 'Иванович' })
+  middleName: string | null;
+}
 
 export class IntegrationDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -49,4 +63,7 @@ export class IntegrationDto {
 
   @ApiProperty({ example: '2026-04-13T11:00:00Z' })
   updatedAt: Date;
+
+  @ApiProperty({ type: IntegrationAuthorDto })
+  author: IntegrationAuthorDto;
 }

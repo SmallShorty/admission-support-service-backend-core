@@ -297,6 +297,15 @@ export class TicketChatGateway
     });
   }
 
+  // Method to notify operators/admins about a new integration notification
+  emitNewIntegrationNotification(notification: any, integrationName: string) {
+    this.server.to('queue:all').emit('newIntegrationNotification', {
+      notification,
+      integrationName,
+      timestamp: new Date(),
+    });
+  }
+
   // Method to emit typing indicator
   @SubscribeMessage('typing')
   handleTyping(

@@ -756,6 +756,75 @@ async function main() {
 
   console.log(`📝 Created ${dynamicVariablesData.length} dynamic variables`);
 
+  // ========== Integrations & Test Notifications ==========
+
+  const integrationFailure = await prisma.integration.create({
+    data: {
+      slug: 'telegram-failure-alert',
+      name: 'Telegram: Сбои системы',
+      eventType: 'FAILURE',
+      theme: 'dark',
+      source: 'https://api.telegram.org/bot123/sendMessage',
+      content: { text: 'Критический сбой системы', chatId: '-100123456' },
+      isTypeEditable: false,
+      isThemeEditable: false,
+      isSourceEditable: false,
+      isContentEditable: true,
+      createdBy: admin.id,
+    },
+  });
+
+  const integrationInfo = await prisma.integration.create({
+    data: {
+      slug: 'general-info-notification',
+      name: 'Общие уведомления',
+      eventType: 'INFORMATIONAL',
+      theme: 'light',
+      source: 'https://api.telegram.org/bot456/sendMessage',
+      content: { text: 'Информационное сообщение', chatId: '-100654321' },
+      isTypeEditable: false,
+      isThemeEditable: true,
+      isSourceEditable: false,
+      isContentEditable: true,
+      createdBy: admin.id,
+    },
+  });
+
+  await prisma.notification.createMany({
+    data: [
+      {
+        integrationId: integrationFailure.id,
+        payload: { eventType: 'FAILURE', theme: 'dark', source: integrationFailure.source, content: { text: 'БД недоступна — ошибка соединения', chatId: '-100123456' } },
+        status: 'SENT',
+        sentAt: new Date(Date.now() - 1000 * 60 * 30),
+      },
+      {
+        integrationId: integrationFailure.id,
+        payload: { eventType: 'FAILURE', theme: 'dark', source: integrationFailure.source, content: { text: 'Сервис аутентификации не отвечает', chatId: '-100123456' } },
+        status: 'FAILED',
+        error: 'Telegram API returned 429 Too Many Requests',
+      },
+      {
+        integrationId: integrationFailure.id,
+        payload: { eventType: 'FAILURE', theme: 'dark', source: integrationFailure.source, content: { text: 'Превышен лимит запросов к внешнему API', chatId: '-100123456' } },
+        status: 'PENDING',
+      },
+      {
+        integrationId: integrationInfo.id,
+        payload: { eventType: 'INFORMATIONAL', theme: 'light', source: integrationInfo.source, content: { text: 'Плановое обслуживание 25 апреля с 02:00 до 04:00', chatId: '-100654321' } },
+        status: 'SENT',
+        sentAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+      },
+      {
+        integrationId: integrationInfo.id,
+        payload: { eventType: 'INFORMATIONAL', theme: 'light', source: integrationInfo.source, content: { text: 'Новая версия системы успешно развёрнута', chatId: '-100654321' } },
+        status: 'PENDING',
+      },
+    ],
+  });
+
+  console.log('🔗 Created 2 integrations with 5 test notifications');
+
   // ========== Final Statistics ==========
 
   const ticketsCount = await prisma.ticket.count();

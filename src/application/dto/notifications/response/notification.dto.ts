@@ -1,5 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationStatus } from 'generated/prisma/enums';
+import {
+  IntegrationAuthorDto,
+  IntegrationDto,
+} from 'src/application/dto/integrations/response/integration.dto';
+
+export class NotificationIntegrationDto {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  id: string;
+
+  @ApiProperty({ example: 'telegram-failure-alert' })
+  slug: string;
+
+  @ApiProperty({ example: 'Telegram Failure Alerts' })
+  name: string;
+
+  @ApiProperty({ type: IntegrationAuthorDto })
+  author: IntegrationAuthorDto;
+}
 
 export class NotificationDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -28,4 +46,7 @@ export class NotificationDto {
 
   @ApiProperty({ example: '2026-04-13T10:00:00Z' })
   createdAt: Date;
+
+  @ApiProperty({ type: NotificationIntegrationDto })
+  integration: NotificationIntegrationDto;
 }
