@@ -23,6 +23,9 @@ export class ApplicantProgramDto {
   @ApiProperty({ example: '01.03.02' })
   programCode: string;
 
+  @ApiProperty({ example: 'Software Engineering' })
+  programName: string;
+
   @ApiProperty({ enum: ['FULL_TIME', 'PART_TIME'], example: 'FULL_TIME' })
   studyForm: string;
 

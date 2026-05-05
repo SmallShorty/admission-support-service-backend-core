@@ -64,6 +64,7 @@ model ApplicantProgram {
   applicantId   String        @map("applicant_id") @db.Uuid
   programId     Int           @map("program_id")
   programCode   String        @map("program_code") @db.VarChar(20)
+  programName   String        @map("program_name") @db.VarChar(255)
   studyForm     StudyForm     @map("study_form")
   admissionType AdmissionType @map("admission_type")
   priority      Int           @db.SmallInt

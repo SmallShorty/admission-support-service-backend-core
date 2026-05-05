@@ -313,6 +313,7 @@ async function main() {
           applicantId: applicantAccount.id,
           programId: 100 * i + j,
           programCode: `${String(Math.floor(Math.random() * 99)).padStart(2, '0')}.${String(Math.floor(Math.random() * 9) + 1).padStart(2, '0')}.${String(Math.floor(Math.random() * 9) + 1).padStart(2, '0')}`,
+          programName: 'Название направления',
           studyForm:
             Math.random() < 0.8 ? StudyForm.FULL_TIME : StudyForm.PART_TIME,
           admissionType: [

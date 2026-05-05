@@ -110,6 +110,7 @@ export interface TicketDetailResponse extends TicketListResponse {
   applicantPrograms?: Array<{
     programId: number;
     programCode: string;
+    programName: string;
     studyForm: string;
     admissionType: string;
     priority: number;
@@ -727,6 +728,12 @@ export class TicketService {
         agent: {
           select: this.agentSelectFields,
         },
+        messages: {
+          where: { authorType: MessageType.FROM_CUSTOMER },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { content: true },
+        },
       },
     });
 
@@ -745,7 +752,7 @@ export class TicketService {
 
     return {
       ...baseResponse,
-      noteText: ticket.noteText,
+      noteText: '',
       intent: ticket.intent,
       assignedAt: ticket.assignedAt?.toISOString() || null,
       firstReplyAt: ticket.firstReplyAt?.toISOString() || null,
@@ -762,6 +769,7 @@ export class TicketService {
         (program: any) => ({
           programId: program.programId,
           programCode: program.programCode,
+          programName: program.programName,
           studyForm: program.studyForm,
           admissionType: program.admissionType,
           priority: program.priority,
